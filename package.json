@@ -1,0 +1,9 @@
+{
+	"type": "module",
+	"devDependencies": {
+		"@types/node": "^18.0.0"
+	},
+	"dependencies": {
+		"zopfli.js": "^1.0.0"
+	}
+}
