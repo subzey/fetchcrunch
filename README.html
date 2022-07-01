@@ -1,0 +1,251 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+<style>
+	html {
+		font: 16px sans-serif;
+	}
+	table {
+		border-collapse: collapse;
+		font: 14px monospace;
+	}
+	td, th {
+		padding: 0;
+		text-align: center;
+	}
+	.legend {
+		padding: 0;
+		padding-inline-end: .5em;
+		text-align: end;
+	}
+	.sep {
+		border: dashed 1px;
+		border-width: 1px 1px 0;
+	}
+	.raw-bytes td {
+		background: #00f3;
+	}
+	.raw-bytes td:nth-child(even) {
+		background: #0f03;
+	}
+	.deflate td {
+		background: #f003;
+	}
+	.deflate td:nth-child(even) {
+		background: #ee03;
+	}
+	td.ellipsis.ellipsis {
+		background: #7773;
+		width: 8ch;
+	}
+	td.payload.payload {
+		font-weight: bold;
+		color: white;
+		background: red;
+	}
+	.code-highlight {
+		background: blue;
+		color: white;
+	}
+</style>
+</head>
+<body>
+	<h2>TL;DR:</h2>
+	<p>The generated page <code>fetch</code>es itself as a binary. Then pipes that binary through <code>DecompressionStream</code> and <code>TextDecodeStream</code>. Finally it <code>eval</code>s the result as JavaScript.</p>
+	<h2>More technical details</h2>
+	<p>The <a href="https://developer.mozilla.org/en-US/docs/Web/API/DecompressionStream"><code>DecompressionStream</code></a> is a relatively new browser API that allows decompression of binary data.</p>
+	<p>Currently supported algorithms are: <code>gzip</code>, <code>deflate</code> and <code>deflate-raw</code>. All three of those are just various flavors of the same algorithm, <a href="https://datatracker.ietf.org/doc/html/rfc1951">DEFLATE</a>, and the only difference it the file header format and CRC.
+	<p><code>deflate-raw</code> is the one that has no header nor CRC, just a raw DEFLATE stream. Naturally, that's the best pick if you aim for the fewest bytes possible. Moreover, the absence of a fixed header allows for some hacky tricks described below.</p>
+	<p>deflate-raw is a binary format and the decompressor would throw an error if it encounters some invalid binary or even stray trailing bytes. So the generated HTML page should be a valid DEFLATE stream at the same time.
+	<details><summary>Could we just catch those errors?</summary>
+	<p>Or, alternatively, we could catch those errors. But that would require more bytes in the uncompressed "bootstrap" code.</p>
+	<p>And it is a spec violation. The exact error handling behavor is undefined. Would the decompressor yield the decompressed data from the last chunk and <strong>then</strong> throw; or would it throw <strong>right away</strong>? There's no anwser, this fragile stuff may blow up any time.</p>
+	</details>
+	<p>It all starts with the 0x0A byte. For the HTML it is the newline and is ignored. For DEFLATE, it's a byte that starts with the bits <code>0 1 0</code>, so it marks the start of the fixed Humman codes block.
+	<details><summary>More about block types</summary>
+	<p>There are three block types:</p>
+	<ul>
+	<li><p>"Stored" uncompressed data. The initial byte should start with <code>0 0 0</code> (LSB first), that's an ASCII space for example. The downside is that then next 4 bytes are the literal block length. And it's virtually impossible to get any valid tag name from that.</p>
+	<li><p>Dynamic Huffman codes <code>0 1 1</code>. Those Huffman codes are encoded immediately after the Start of Block marker and it's almost impossible to make an arbitrary text to be a valid encoded Huffman codes table.
+	<li><p>Static Huffman codes <code>0 1 0</code>. The builtin hardcoded table is used and thus not present in the binary stream. That's the block type we'll use for our dark purposes.
+	</details>
+	<p>Almost any combination of bits after that can be treated as valid code. We must be careful not to encode an invalid backreference. But if it happens we just change the data slightly: ex. <code>&lt;BODY&gt;</code> into <code>&lt;bODY&gt;</code>.
+	<p>Luckily, this lead-in section is quite short and the chances it to be the invalid DEFLATE block are low.
+	<p>Decoding ex. <code>↵&lt;body⇥</code> yields the bytes <code>0x51 0xC1 0x3F 0x32 0x39 0xD2</code>. We don't actually care what's those bytes. The fact it's decodable at all is all that matters.
+	<p>From the HTML perspective we're now inside opened <code>body</code> tag ready to parse the attributes. Almost any garbage is ignored at this stage, so now it's time to write the End-of-Block marker and start a new block of type 0: The literal values.
+	<p>Next, the <code>onload</code> bootstrap code follows. DEFLATE ignores anything treating it as the literal values.
+	<p>Finally, the literal block ends and the compressed data starts. Due to the "blocky" nature of the DEFLATE algorithm, we can just glue up the highly compressed blocks from Zopfli. And that's it.
+	<p>
+	<p>The resulting file layout is:</p>
+	<table>
+	<tr><th><th class="sep" colspan="96">"Lead-in"
+		<th class="sep" colspan="128">"Bootstrap"
+		<th class="sep" colspan="16">"Payload"
+	<tr><th class="legend">As HTML</th>
+        <td colspan="8">↵
+		<td colspan="8">&#60;
+		<td colspan="8">b
+		<td colspan="8">o
+		<td colspan="8">d
+		<td colspan="8">y
+		<td colspan="8">⇥
+		<td colspan="40" class="ellipsis">garbage
+		<td colspan="8"> 
+		<td colspan="8">o
+		<td colspan="8">n
+		<td colspan="8">l
+		<td colspan="8">o
+		<td colspan="8">a
+		<td colspan="8">d
+		<td colspan="8">=
+		<td colspan="8">&#34;
+		<td class="payload" colspan="8">bootstrap code
+		<td colspan="8">&#34;
+		<td colspan="8">&#62;
+		<td colspan="8">&#60;
+		<td colspan="8">!
+		<td colspan="8">-
+		<td colspan="8">-
+		<td colspan="16" class="ellipsis">garbage
+	<tr class="raw-bytes"><th class="legend">As binary</th>
+		<td colspan="8">0x0A
+		<td colspan="8">0x3C
+		<td colspan="8">0x62
+		<td colspan="8">0x6F
+		<td colspan="8">0x64
+		<td colspan="8">0x79
+		<td colspan="8">0x09
+		<td colspan="8">0x00
+		<td colspan="8">0xC6
+		<td colspan="8">0x00
+		<td colspan="8">0x39
+		<td colspan="8">0xFF
+		<td colspan="8">0x20
+		<td colspan="8">0x6F
+		<td colspan="8">0x6E
+		<td colspan="8">0x6C
+		<td colspan="8">0x6F
+		<td colspan="8">0x61
+		<td colspan="8">0x64
+		<td colspan="8">0x3D
+		<td colspan="8">0x22
+		<td class="ellipsis" colspan="8">&hellip;
+		<td colspan="8">0x22
+		<td colspan="8">0x3E
+		<td colspan="8">0x3C
+		<td colspan="8">0x21
+		<td colspan="8">0x2D
+		<td colspan="8">0x2D
+		<td colspan="16" class="ellipsis">&hellip;
+	<tr><th class="legend">As bits, LSB first</th>
+        <td>0<td>1<td>0<td>1<td>0<td>0<td>0<td>0
+        <td>0<td>0<td>1<td>1<td>1<td>1<td>0<td>0
+        <td>0<td>1<td>0<td>0<td>0<td>1<td>1<td>0
+        <td>1<td>1<td>1<td>1<td>0<td>1<td>1<td>0
+        <td>0<td>0<td>1<td>0<td>0<td>1<td>1<td>0
+        <td>1<td>0<td>0<td>1<td>1<td>1<td>1<td>0
+        <td>1<td>0<td>0<td>1<td>0<td>0<td>0<td>0
+        <td>0<td>0<td>0<td>0<td>0<td>0<td>0<td>0
+        <td>0<td>1<td>1<td>0<td>0<td>0<td>1<td>1
+        <td>0<td>0<td>0<td>0<td>0<td>0<td>0<td>0
+        <td>1<td>0<td>0<td>1<td>1<td>1<td>0<td>0
+        <td>1<td>1<td>1<td>1<td>1<td>1<td>1<td>1
+        <td>0<td>0<td>0<td>0<td>0<td>1<td>0<td>0
+        <td>1<td>1<td>1<td>1<td>0<td>1<td>1<td>0
+        <td>0<td>1<td>1<td>1<td>0<td>1<td>1<td>0
+        <td>0<td>0<td>1<td>1<td>0<td>1<td>1<td>0
+        <td>1<td>1<td>1<td>1<td>0<td>1<td>1<td>0
+        <td>1<td>0<td>0<td>0<td>0<td>1<td>1<td>0
+        <td>0<td>0<td>1<td>0<td>0<td>1<td>1<td>0
+        <td>1<td>0<td>1<td>1<td>1<td>1<td>0<td>0
+        <td>0<td>1<td>0<td>0<td>0<td>1<td>0<td>0
+		<td class="ellipsis" colspan="8">&hellip;
+        <td>0<td>1<td>0<td>0<td>0<td>1<td>0<td>0
+        <td>0<td>1<td>1<td>1<td>1<td>1<td>0<td>0
+        <td>0<td>0<td>1<td>1<td>1<td>1<td>0<td>0
+        <td>1<td>0<td>0<td>0<td>0<td>1<td>0<td>0
+        <td>1<td>0<td>1<td>1<td>0<td>1<td>0<td>0
+        <td>1<td>0<td>1<td>1<td>0<td>1<td>0<td>0
+        <td class="ellipsis" colspan="16">&hellip;
+	</tr>
+	<tr class="deflate"><th class="legend">As DEFLATE stream</th>
+		<td colspan="3"><abbr title="Start of block, fixed Huffman codes, is not final">SOB</abbr>
+		<td colspan="8">0x51
+		<td colspan="9">0xC1
+		<td colspan="8">0x3F
+		<td colspan="8">0x32
+		<td colspan="8">0x39
+		<td colspan="9">0xD2
+		<td colspan="7"><abbr title="End of block marker">EOB</abbr>
+		<td colspan="3"><abbr title="Start of block, stored literal values, is not final">SOB</abbr>
+		<td colspan="1"><abbr title="Padding up to the byte boundary, ignored">&times;</abbr>
+		<td colspan="32">Count of literal values
+		<td colspan="8">0x20
+		<td colspan="8">0x6F
+		<td colspan="8">0x6E
+		<td colspan="88">&hellip;more literal values stored&hellip;
+		<td colspan="8">0x2D
+		<td colspan="8">0x2D
+		<td colspan="16">&hellip;more deflate blocks compressed with zopfli
+	</tr>
+	<tr><th class="legend">As decoded DEFLATE</th>
+		<td colspan="3">
+		<td colspan="8">Q
+		<td colspan="9">&#xfffd;
+		<td colspan="8">?
+		<td colspan="8">2
+		<td colspan="8">9
+		<td colspan="9">&#xfffd;
+		<td colspan="7">
+		<td colspan="3">
+		<td colspan="1">
+		<td colspan="32">
+		<td colspan="8"> 
+		<td colspan="8">o
+		<td colspan="8">n
+		<td colspan="8">l
+		<td colspan="8">o
+		<td colspan="8">a
+		<td colspan="8">d
+		<td colspan="8">=
+		<td colspan="8">&quot;
+		<td colspan="8" class="ellipsis">&hellip;
+		<td colspan="8">&quot;
+		<td colspan="8">&gt;
+		<td colspan="8">&lt;
+		<td colspan="8">!
+		<td colspan="8">-
+		<td colspan="8">-
+		<td colspan="8">↵
+		<td colspan="8" class="payload">arbitratry JavaScript
+	</tr>
+</table>
+<p>Upon loading the page decompresses itself as a DEFLATE raw. But just the decompressed string cannot be evaluated as it contains the lean-in garbage and a chunk of the bootstrap HTML.</p>
+<p>This is avoided by prepending a JS comment <code>//</code> to the string. There should be a newline terminating this comment just before the actual JS payload.</p>
+<pre><span class="code-highlight">//</span>Q&#xfffd;?29&#xfffd; onload="&hellip;">&lt;!--<span class="code-highlight">↵</span>
+theDecompressedJavaScriptCode()</pre>
+
+<h2>Precautions</h2>
+<p>Some precautions should be taken:</p>
+<p>The <code>&lt;body </code> opened in the lead-in section should not be closed prematurely: The literal "closing waka" <code>&gt;</code> character should not appear. That means, the bootstrap section cannot be of length 62 or 193.</p>
+<p>The leading <code>//</code> should not be closed prematurely. That means, the decoded bytes from the lead-in section should not contain a newline.<p>
+<p>Note: There are no restrictions for the JS payload, both compressed and uncopmpressed.
+
+<h2>Further improvements</h2>
+<h3>Newlines</h3>
+<p>The comment terminating newline should just be in the decompressed text. It doesn't really matter if it's in the Zopfli'ed part of the stream or is it in the literal bootstrap block.</p>
+<p>Intuitively, it feels like a good idea to move as much as possible into the compressed part. But the minified JS typically doesn't contain any newlines and that newline could be the only newline in the entire compressed part.</p>
+<p>Each unique encoded value occupies its place in the Huffman tree and having a very-rare-occuring character is not very good for compression. Probably, that newline could be moved to the literal part.</p>
+<p>Future implementations should pick the best placement for the newline character.</p>
+<h3>Dictionary</h3>
+<p>The bootstrap code is included into the DEFLATE stream. The downside is that it should be "inhibited" with a comment and a newline. But surprisingly there's an upside as well:</p>
+<p>The compressor may use portions of this bootstrap for back-references. For example, instead of encoding <code>async </code> or <code>body</code> the compressor may just encode a reference back to the already decoded data.</p>
+<p>And conversely, the bootstrap code may be changed a bit to utilize back-references. For example, if the compressed part includes an arrow function with the parameter <code>a</code>: <code>a=&gt;{&hellip;}</code>, the bootstrap may use the same variable name so the common part <code class="code-highlight">a=&gt;</code> can be backreferenced.</p>
+<p>Regular GZIP/DEFLATE compressor allows setting that backbuffer manually using the <code>dictionary</code> setting. It looks like Zopfli cannot do that.
+<p>Future implementations should use the dictionary when copressing the payload.
+<h3>Literal blocks merger</h3>
+<p>It is quite unlikely in practice, but the leading block of the compressed payload could be a literal type-0 block. In this case it should be merged with the bootstrap literal block.
+</body>
+</html>
