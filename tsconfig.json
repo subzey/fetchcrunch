@@ -1,0 +1,9 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist/",
+		"allowSyntheticDefaultImports": true,
+		"target": "ES2020",
+		"moduleResolution": "node",
+		"strict": true
+	}
+}
