@@ -22,7 +22,7 @@ export abstract class FetchCrunchBase {
 	protected abstract _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Uint8Array;
 
 	protected _templateHead(): string {
-		return '<svg';
+		return '<svg ';
 	}
 
 	protected _templateTail(): string {
@@ -36,7 +36,7 @@ export abstract class FetchCrunchBase {
 			(
 				async ${evaledStringV}=>{
 					for(
-						${readerV}=(await fetch(\`\`)).body.pipeThrough(new DecompressionStream(\`deflate-raw\`)).pipeThrough(new TextDecoderStream).getReader();
+						${readerV}=(await fetch\`\`).body.pipeThrough(new DecompressionStream(\`deflate-raw\`)).pipeThrough(new TextDecoderStream).getReader();
 						${chunkV}=(await ${readerV}.read()).value;
 						${evaledStringV}+=${chunkV}
 					);
@@ -193,7 +193,7 @@ export abstract class FetchCrunchBase {
 				if (!literalIncludesTail) {
 					const compressedAsString = new TextDecoder().decode(compressed);
 					const tagEndIndex = findTagEnd(compressedAsString);
-					if (tagEndIndex === -1 || compressedAsString.slice(tagEndIndex).startsWith(templateTail)) {
+					if (tagEndIndex === -1 || !compressedAsString.slice(tagEndIndex).startsWith(templateTail)) {
 						// Last resort: There's a still a small chance the last byte may be
 						// converted into a closing waka
 						compressed[compressed.byteLength -1] = 0x3e; // ">"

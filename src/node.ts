@@ -2,7 +2,7 @@ import { inflateRawSync } from "node:zlib";
 
 import Zopfli from 'zopfli.js/bin/zopfli.raw.min.js';
 
-import { FetchCrunchBase } from "./index.js";
+import { FetchCrunchBase } from "./base.js";
 
 export class FetchCrunchNode extends FetchCrunchBase {
 	protected _binaryFromDeflateRaw(compressed: Uint8Array): Uint8Array {

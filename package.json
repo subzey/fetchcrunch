@@ -1,5 +1,13 @@
 {
 	"type": "module",
+	"exports": {
+		"./base": "./base.js",
+		".": {
+			"node": "./node.js",
+			"default": "./browser.js"
+		}
+	},
+	"bin": "./cli.js",
 	"scripts": {
 		"build": "tsc && node build-tools/copy-package-json"
 	},
@@ -10,4 +18,5 @@
 	"dependencies": {
 		"zopfli.js": "^1.0.0"
 	}
+
 }
