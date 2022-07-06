@@ -15,11 +15,14 @@ async function readStdin() {
 async function main() {
 	const stdin = await readStdin();
 	const fetchCrunch = new FetchCrunchNode();
-	process.stdout.write(fetchCrunch.crunch(stdin), () => {
-		if (process.stdout.isTTY) {
-			process.stderr.write('\n');
+	process.stdout.write(
+		await fetchCrunch.crunch(stdin),
+		() => {
+			if (process.stdout.isTTY) {
+				process.stderr.write('\n');
+			}
 		}
-	});
+	);
 }
 
 main();

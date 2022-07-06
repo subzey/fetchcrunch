@@ -5,6 +5,7 @@ export abstract class WasmZopfliBase {
 	private _wasmExports: Promise<WasmExports>;
 	private _outPtrPtr?: number;
 	private _outSizePtr?: number;
+	private _bpPtr?: number;
 
 	protected abstract _loadWasmBinary(): Promise<Uint8Array>;
 
@@ -20,17 +21,23 @@ export abstract class WasmZopfliBase {
 		}
 
 		const { memory, allocBuf, freeBuf, compress } = await this._wasmExports;
-		const outPtrPtr = this._outPtrPtr ??= allocBuf(4); // Never freed
-		const outSizePtr = this._outSizePtr ??= allocBuf(4); // Never freed
+		const outPtrPtr = this._outPtrPtr ??= allocBuf(9); // Never freed
+		const outSizePtr = outPtrPtr + 4;
+		const bpPtr = outPtrPtr + 8;
 
 		const inSize = input.byteLength + dictionary.byteLength;
 		const inPtr = allocBuf(inSize);
 		const memorySlice = new Uint8Array(memory.buffer, inPtr, inSize);
 		memorySlice.set(dictionary, 0);
 		memorySlice.set(input, dictionary.byteLength);
+
+		// Reset bit pointer
+		new Uint8Array(memory.buffer, bpPtr, 1)[0] = 0;
+
 		compress(
 			this._numIterations,
-			inPtr, dictionary.byteLength, input.byteLength,
+			inPtr, dictionary.byteLength, inSize,
+			bpPtr,
 			outPtrPtr, outSizePtr
 		);
 		
@@ -39,6 +46,10 @@ export abstract class WasmZopfliBase {
 		const dataView = new DataView(memory.buffer);
 		const outPtr = dataView.getUint32(outPtrPtr, true);
 		const outSize = dataView.getUint32(outSizePtr, true);
+
+		// TODO: Return it
+		// const bitCount = dataView.getUint8(bpPtr);
+
 		// Copy result into a separate Uint8Array backed by a separate ArrayBuffer
 		// as the values in the wasm memory is about to be free()'d.
 		const result = new Uint8Array(memory.buffer, outPtr, outSize).slice();
@@ -58,7 +69,7 @@ export abstract class WasmZopfliBase {
 				wasi_snapshot_preview1: {
 					proc_exit() { throw new Error('proc_exit() is not implemented') },
 					fd_close() { throw new Error('fd_close() is not implemented') },
-					fd_write() { throw new Error('fd_write() is not implemented') },
+					fd_write(...args: unknown[]) { throw new Error('fd_write() is not implemented') },
 					fd_seek() { throw new Error('fd_seek() is not implemented') },
 				}
 			}

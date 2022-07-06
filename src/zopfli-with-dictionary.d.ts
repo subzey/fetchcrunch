@@ -11,6 +11,8 @@ export interface WasmExports {
 		inStart: number,
 		/* Length of input */
 		inSize: number,
+		/* The memory location of the bit counter */
+		bpPtr: number,
 		/* The memory location of the output start will be stored at this address */
 		outPtrPtr: number,
 		/* The output length will be stored at this address */

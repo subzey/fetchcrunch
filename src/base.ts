@@ -19,7 +19,7 @@ export abstract class FetchCrunchBase {
 	/** Implement me! */
 	protected abstract _binaryFromDeflateRaw(compressed: Uint8Array): Uint8Array;
 	/** Implement me! */
-	protected abstract _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Uint8Array;
+	protected abstract _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Uint8Array | Promise<Uint8Array>;
 
 	protected _templateHead(): string {
 		return '<svg ';
@@ -139,7 +139,7 @@ export abstract class FetchCrunchBase {
 		return true;
 	}
 
-	protected _generateBootstrapAndPayload(payload: Uint8Array) {
+	protected async _generateBootstrapAndPayload(payload: Uint8Array) {
 		const evalAttributeBytes = new TextEncoder().encode(' ' + this._jsEvalAttribute({
 			quote: '"',
 			// TODO: Analyze the payload to get the variable names that are backrefs
@@ -184,7 +184,7 @@ export abstract class FetchCrunchBase {
 
 				const stuffToCompress = literalIncludesNewline ? payload : bytesConcat(newlineBytes, payload);
 				// We're super-lazy with the compression as it is really heavy
-				const compressed = this._deflateRawFromBinary(stuffToCompress, literalBlock);
+				const compressed = await this._deflateRawFromBinary(stuffToCompress, literalBlock);
 
 				if (bestResult !== null && literalBlock.byteLength + compressed.byteLength > bestResult.byteLength) {
 					continue;
@@ -217,9 +217,9 @@ export abstract class FetchCrunchBase {
 		return bestResult;
 	}
 
-	public crunch(payload: string | Uint8Array): Uint8Array;
+	public async crunch(payload: string | Uint8Array): Promise<Uint8Array>;
 	// Overload for the sick sad untyped JavaScript world
-	public crunch(payload: unknown): Uint8Array {
+	public async crunch(payload: unknown): Promise<Uint8Array> {
 		let payloadBytes: Uint8Array;
 		if (typeof payload === 'string') {
 			payloadBytes = new TextEncoder().encode(payload);
@@ -230,7 +230,7 @@ export abstract class FetchCrunchBase {
 		}
 
 		this._leadIn ??= this._generateLeadIn(this._templateHead());
-		const bootstrapAndPayload = this._generateBootstrapAndPayload(payloadBytes);
+		const bootstrapAndPayload = await this._generateBootstrapAndPayload(payloadBytes);
 
 		return bytesConcat(this._leadIn, bootstrapAndPayload);
 	}

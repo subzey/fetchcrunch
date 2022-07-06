@@ -17,6 +17,7 @@ EMSCRIPTEN_KEEPALIVE
 void compress(
 	int numiterations,
 	const unsigned char* in, size_t instart, size_t insize,
+	unsigned char* bp,
 	unsigned char** out, size_t* outsize
 ) {
 	ZopfliOptions options;
@@ -28,7 +29,7 @@ void compress(
 		2, // btype: try all
 		1, // final
 		in, instart, insize,
-		0, // bit pointer: 0, aligned to the byte boundary
+		bp,
 		out, outsize
 	);
 }
