@@ -3,7 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 
 const baseUrl = new URL('../', import.meta.url);
 
-async function main() {
+async function copyPackageJson() {
 	const pkgMeta = JSON.parse(
 		await readFile(
 			fileURLToPath(new URL('package.json', baseUrl)
@@ -17,4 +17,15 @@ async function main() {
 	);
 }
 
-main();
+async function copyWasm() {
+	const wasmBinary = await readFile(
+		fileURLToPath(new URL('artifacts/zopfli-with-dictionary.wasm', baseUrl))
+	);
+	await writeFile(
+		fileURLToPath(new URL('dist/zopfli-with-dictionary.wasm', baseUrl)),
+		wasmBinary
+	);
+}
+
+copyPackageJson();
+copyWasm();

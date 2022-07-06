@@ -3,6 +3,7 @@
 		"outDir": "./dist/",
 		"allowSyntheticDefaultImports": true,
 		"target": "ES2020",
+		"module": "ESNext",
 		"moduleResolution": "node",
 		"strict": true
 	}
