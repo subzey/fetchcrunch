@@ -1,11 +1,10 @@
-#include <stdint.h>
 #include "emscripten.h"
 #include "../zopfli/src/zopfli/zopfli.h"
 #include "../zopfli/src/zopfli/deflate.h"
 
 EMSCRIPTEN_KEEPALIVE
-uint8_t* allocBuf(int len) {
-	return malloc(len * sizeof(uint8_t));
+void* allocBuf(int len) {
+	return malloc(len * sizeof(unsigned char));
 }
 
 EMSCRIPTEN_KEEPALIVE
