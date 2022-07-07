@@ -1,5 +1,6 @@
-import { FetchCrunchNode } from "./node.js";
+#!/usr/bin/env node
 
+import { FetchCrunchNode } from "./node.js";
 
 async function readStdin() {
 	if (process.stdin.isTTY) {
