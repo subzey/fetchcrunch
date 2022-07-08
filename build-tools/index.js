@@ -18,6 +18,14 @@ let pkgMetaPromise = (async function processPackageJson() {
 	await writeFile(pathFromProjectRoot('dist/package.json'), JSON.stringify(await pkgMetaPromise, null, 2));
 })();
 
+(async function copyReadme() {
+	const readme = await readFile(
+		pathFromProjectRoot('README.md'),
+		{ encoding: 'utf-8' }
+	);
+	await writeFile(pathFromProjectRoot('dist/README.md'), readme);
+})();
+
 (async function copyWasm() {
 	const wasmBinary = await readFile(
 		pathFromProjectRoot('artifacts/zopfli-with-dictionary.wasm')
