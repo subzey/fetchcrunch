@@ -21,8 +21,8 @@
 		"url": "git@github.com:subzey/fetchcrunch.git"
 	},
 	"scripts": {
-		"build": "tsc && node build-tools/index.js",
-		"build-wasm": "emcc -O3 -sSTRICT -sFILESYSTEM=0 -sWASM=1 --no-entry -o artifacts/zopfli-with-dictionary.wasm zopfli/src/zopfli/deflate.c zopfli/src/zopfli/lz77.c zopfli/src/zopfli/cache.c zopfli/src/zopfli/katajainen.c zopfli/src/zopfli/squeeze.c zopfli/src/zopfli/blocksplitter.c zopfli/src/zopfli/hash.c zopfli/src/zopfli/tree.c zopfli/src/zopfli/util.c src/zopfli-with-dictionary.c"
+		"build": "tsc -p src/package && node build-tools",
+		"build-wasm": "emcc -O3 -sSTRICT -sFILESYSTEM=0 -sWASM=1 --no-entry -o artifacts/zopfli-with-dictionary.wasm zopfli/src/zopfli/deflate.c zopfli/src/zopfli/lz77.c zopfli/src/zopfli/cache.c zopfli/src/zopfli/katajainen.c zopfli/src/zopfli/squeeze.c zopfli/src/zopfli/blocksplitter.c zopfli/src/zopfli/hash.c zopfli/src/zopfli/tree.c zopfli/src/zopfli/util.c src/package/zopfli-with-dictionary.c"
 	},
 	"devDependencies": {
 		"@types/node": "^18.0.0",

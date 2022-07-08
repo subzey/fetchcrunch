@@ -1,6 +1,6 @@
 #include "emscripten.h"
-#include "../zopfli/src/zopfli/zopfli.h"
-#include "../zopfli/src/zopfli/deflate.h"
+#include "../../zopfli/src/zopfli/zopfli.h"
+#include "../../zopfli/src/zopfli/deflate.h"
 
 EMSCRIPTEN_KEEPALIVE
 void* allocBuf(int len) {

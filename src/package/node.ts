@@ -1,7 +1,5 @@
 import { inflateRawSync } from "node:zlib";
 
-import Zopfli from 'zopfli.js/bin/zopfli.raw.min.js';
-
 import { FetchCrunchBase } from "./base.js";
 import { WasmZopfliNode } from "./wasm-zopfli-node.js";
 
