@@ -81,3 +81,13 @@ export function findTagEnd(htmlChunk: string): number {
 	const cleanedChunk = htmlChunk.replace(/[^ \t\n\r>]+=("|').*?(\1|$)/g, (s) => 'x'.repeat(s.length));
 	return cleanedChunk.indexOf('>');
 }
+
+let textDecoder = new TextDecoder();
+export function stringFromBytes(bytes: Uint8Array): string {
+	return textDecoder.decode(bytes);
+}
+
+let textEncoder = new TextEncoder();
+export function bytesFromString(str: string): Uint8Array {
+	return textEncoder.encode(str);
+}

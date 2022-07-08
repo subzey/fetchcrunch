@@ -1,13 +1,9 @@
-import { bitsFromBytes, bytesFromBits, bytesConcat, htmlVariants, findTagEnd } from "./junkyard.js";
+import { bitsFromBytes, bytesFromBits, bytesConcat, htmlVariants, findTagEnd, bytesFromString } from "./junkyard.js";
+import { bytesFromTemplate, Template } from "./payload-dependent-template.js";
 
 export interface Options {
 	head?: string;
 	tail?: string;
-}
-
-export interface JsEvalAttributeParams {
-	quote: '"' | '\'';
-	variables: [string, string, string];
 }
 
 /**
@@ -29,22 +25,38 @@ export abstract class FetchCrunchBase {
 		return '>';
 	}
 
-	protected _jsEvalAttribute(params: JsEvalAttributeParams): string {
-		const { quote, variables: [ evaledStringV, readerV, chunkV ]} = params;
-		return `
-		onload=${quote}
-			(
-				async ${evaledStringV}=>{
-					for(
-						${readerV}=(await fetch\`\`).body.pipeThrough(new DecompressionStream(\`deflate-raw\`)).pipeThrough(new TextDecoderStream).getReader();
-						${chunkV}=(await ${readerV}.read()).value;
-						${evaledStringV}+=${chunkV}
-					);
-					eval(${evaledStringV})
-				}
-			)\`//\`
-		${quote}
-		`.replace(/\n\s*/g, '').trim();
+	protected _jsEvalAttribute(payload: ArrayLike<number>): Uint8Array {
+		const identifierStart = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_';
+		const quote = new Set(bytesFromString(`"'`));
+		const evaledStringV = new Set(bytesFromString('s' + identifierStart));
+		const readerV = new Set(bytesFromString('r' + identifierStart));
+		const chunkV = new Set(bytesFromString('c' + identifierStart));
+
+		// TODO: mutually exclusive
+
+		const template: (number | Set<number>)[] = [];
+		for (const v of [
+			'onload=', quote,
+				'(',
+					'async ', evaledStringV, '=>{',
+						'for(',
+							readerV, '=(await fetch``).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
+							chunkV, '=(await ', readerV, '.read()).value;',
+							evaledStringV, '+=', chunkV,
+						');',
+						'eval(', evaledStringV, ')',
+					'}',
+				')`//`',
+			quote
+		]) {
+			if (typeof v === 'string') {
+				template.push(...bytesFromString(v))
+			} else {
+				template.push(v);
+			}
+		}
+
+		return Uint8Array.from(bytesFromTemplate(template, payload));
 	}
 
 	/** 
@@ -140,11 +152,7 @@ export abstract class FetchCrunchBase {
 	}
 
 	protected async _generateBootstrapAndPayload(payload: Uint8Array) {
-		const evalAttributeBytes = new TextEncoder().encode(' ' + this._jsEvalAttribute({
-			quote: '"',
-			// TODO: Analyze the payload to get the variable names that are backrefs
-			variables: ['s', 'r', 'c'],
-		}));
+		const evalAttributeBytes = this._jsEvalAttribute(payload);
 		const templateTail = this._templateTail();
 		const templateTailBytes = new TextEncoder().encode(templateTail);
 		const newlineBytes = Uint8Array.of(0x0A);
