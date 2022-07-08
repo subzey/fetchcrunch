@@ -1,11 +1,12 @@
 {
 	"private": true,
 	"type": "module",
+	"name": "fetchcrunch",
+	"version": "1.0.0-beta.1",
 	"exports": {
 		"./base": "./base.js",
 		".": {
-			"node": "./node.js",
-			"default": "./browser.js"
+			"node": "./node.js"
 		}
 	},
 	"bin": "./cli.js",

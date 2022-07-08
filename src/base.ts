@@ -36,7 +36,7 @@ export abstract class FetchCrunchBase {
 
 		const template: (number | Set<number>)[] = [];
 		for (const v of [
-			'onload=', quote,
+			' onload=', quote,
 				'(',
 					'async ', evaledStringV, '=>{',
 						'for(',
@@ -202,15 +202,7 @@ export abstract class FetchCrunchBase {
 					const compressedAsString = new TextDecoder().decode(compressed);
 					const tagEndIndex = findTagEnd(compressedAsString);
 					if (tagEndIndex === -1 || !compressedAsString.slice(tagEndIndex).startsWith(templateTail)) {
-						// Last resort: There's a still a small chance the last byte may be
-						// converted into a closing waka
-						compressed[compressed.byteLength -1] = 0x3e; // ">"
-						try {
-							this._binaryFromDeflateRaw(compressed);
-						} catch (e) {
-							// No luck
-							continue;
-						}
+						continue;
 					}
 				}
 
