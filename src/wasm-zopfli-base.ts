@@ -4,8 +4,6 @@ export abstract class WasmZopfliBase {
 	private _numIterations: number;
 	private _wasmExports: Promise<WasmExports>;
 	private _outPtrPtr?: number;
-	private _outSizePtr?: number;
-	private _bpPtr?: number;
 
 	protected abstract _loadWasmBinary(): Promise<Uint8Array>;
 
