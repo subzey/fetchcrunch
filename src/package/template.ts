@@ -1,4 +1,4 @@
-import { parseFragment, DefaultTreeAdapterMap } from 'parse5';
+import { parse, parseFragment, DefaultTreeAdapterMap } from 'parse5';
 
 export type StringTemplateVariants = Set<string> & {
 	mutuallyExclusiveWith?: StringTemplateVariants[];
@@ -18,10 +18,10 @@ interface IntermediateRepresentationItem {
 export type IR = IntermediateRepresentationItem[];
 
 export function irFromHtml(html: string): { ir: IR, ids: Set<string> } {
-	const fragment: DefaultTreeAdapterMap['documentFragment'] = parseFragment(html, { sourceCodeLocationInfo: true });
+	const doc: DefaultTreeAdapterMap['document'] = parse(html, { sourceCodeLocationInfo: true });
 	return {
-		ir: Array.from(irFromConcreteTree(html, fragment)),
-		ids: new Set(collectIds(fragment)),
+		ir: Array.from(irFromConcreteTree(html, doc)),
+		ids: new Set(collectIds(doc)),
 	};
 }
 
@@ -167,7 +167,7 @@ function templateItemFromAttrValue(attrValue: string): { template: StringTemplat
 
 	if (!/['"&]/.test(attrValue)) {
 		// No special precautions
-		const quote = new Set(`'"`);
+		const quote = new Set(`"'`);
 		return {
 			template: [quote, attrValue, quote],
 			needsSeparator: false,
@@ -179,7 +179,7 @@ function templateItemFromAttrValue(attrValue: string): { template: StringTemplat
 	const usingDoubleQuote = sloppyEscaped(`"${strictlyEscapedValue}"`, attrValue);
 
 	if (usingSingleQuote.slice(1, usingSingleQuote.length - 1) === usingDoubleQuote.slice(1, usingDoubleQuote.length - 1)) {
-		const quote = new Set(`'"`);
+		const quote = new Set(`"'`);
 		return {
 			template: [quote, usingSingleQuote.slice(1, usingSingleQuote.length - 1), quote],
 			needsSeparator: false,
@@ -196,7 +196,6 @@ function templateItemFromAttrValue(attrValue: string): { template: StringTemplat
 // It's a bit heavy, but is precise
 function testHtmlAttr(attrHtmlChunk: string, shouldBe: string): boolean {
 	const frag = parseFragment(`<i x=${attrHtmlChunk}>`);
-	console.log(frag);
 	const attr = (frag.childNodes[0] as DefaultTreeAdapterMap['element']).attrs[0];
 	if (!attr) {
 		return false;
@@ -247,7 +246,7 @@ function stringTemplateFromIr(ir: IntermediateRepresentationItem[], onloadTempla
 			continue
 		}
 		if (irItem.kind === 'onload-attr-value') {
-			const quote = new Set(`'"`);
+			const quote = new Set(`"'`);
 			if (onloadTemplate === undefined) {
 				throw new Error('Unexpected onload template insertion point');
 			}

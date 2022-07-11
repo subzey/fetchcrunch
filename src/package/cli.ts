@@ -42,7 +42,8 @@ Usage:
   ${pkgMeta.name} [OPTIONS]
 
 Options:
-  --help     This help. \uD83D\uDE01
+  --template=  Specify template. Be careful with shell quotes!
+  --help       This help. \uD83D\uDE01
 
 There are no other CLI options so far.
 Since you are here, I assume you're a JavaScript developer. Feel free to extend the FetchCrunchNode class and use it with your own tweaks:
@@ -63,6 +64,8 @@ async function readStdin(): Promise<string> {
 }
 
 async function main(): Promise<void> {
+	let template: string | undefined;
+
 	if (process.argv.length > 2) {
 		if (process.argv.indexOf('--help') >= 2) {
 			await printHelp();
@@ -73,15 +76,25 @@ async function main(): Promise<void> {
 				await printVersion();
 				return;
 			}
+			if (process.argv[i].startsWith('--template=')) {
+				template = process.argv[i].slice('--template='.length);
+				continue;
+			}
 			process.stderr.write(`Unknown option: ${process.argv[i]}. Run with --help for help.\n`);
 			process.exit(1);
 			throw new Error('How did you get there?');
 		}
 	}
 
-
 	const stdin = await readStdin();
-	const fetchCrunch = new FetchCrunchNode();
+
+	const FetchCrunchCli = class extends FetchCrunchNode {
+		protected override _htmlTemplate(): string {
+			return template ?? super._htmlTemplate();
+		}
+	}
+
+	const fetchCrunch = new FetchCrunchCli();
 	process.stdout.write(
 		await fetchCrunch.crunch(stdin),
 		() => {
