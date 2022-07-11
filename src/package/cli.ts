@@ -42,8 +42,9 @@ Usage:
   ${pkgMeta.name} [OPTIONS]
 
 Options:
-  --template=  Specify template. Be careful with shell quotes!
-  --help       This help. \uD83D\uDE01
+  --template=    Specify template. Be careful with shell quotes!
+  --iterations=  Zopfli # of iterations. Default is 50.
+  --help         This help. \uD83D\uDE01
 
 There are no other CLI options so far.
 Since you are here, I assume you're a JavaScript developer. Feel free to extend the FetchCrunchNode class and use it with your own tweaks:
@@ -65,6 +66,7 @@ async function readStdin(): Promise<string> {
 
 async function main(): Promise<void> {
 	let template: string | undefined;
+	let iterations: number | undefined;
 
 	if (process.argv.length > 2) {
 		if (process.argv.indexOf('--help') >= 2) {
@@ -80,6 +82,15 @@ async function main(): Promise<void> {
 				template = process.argv[i].slice('--template='.length);
 				continue;
 			}
+			if (process.argv[i].startsWith('--iterations=')) {
+				const iterationsStr = process.argv[i].slice('--iterations='.length);
+				iterations = Math.ceil(Number(iterationsStr));
+				if (!iterationsStr || !Number.isFinite(iterations) || iterations <= 0) {
+					process.stderr.write(`Invalid option value: ${process.argv[i]}. Run with --help for help.\n`);		
+				}
+				continue;
+			}
+
 			process.stderr.write(`Unknown option: ${process.argv[i]}. Run with --help for help.\n`);
 			process.exit(1);
 			throw new Error('How did you get there?');
@@ -91,6 +102,9 @@ async function main(): Promise<void> {
 	const FetchCrunchCli = class extends FetchCrunchNode {
 		protected override _htmlTemplate(): string {
 			return template ?? super._htmlTemplate();
+		}
+		protected override _zopfliIterations(): number {
+			return iterations ?? super._zopfliIterations();
 		}
 	}
 

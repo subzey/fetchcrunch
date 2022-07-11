@@ -88,10 +88,10 @@ export abstract class WasmZopfliBase {
 				// Stub WASI functions
 				// The implementation is not supposed to read/write anything from FS
 				wasi_snapshot_preview1: {
-					proc_exit() { throw new Error('proc_exit() is not implemented') },
-					fd_close() { throw new Error('fd_close() is not implemented') },
-					fd_write() { throw new Error('fd_write() is not implemented') },
-					fd_seek() { throw new Error('fd_seek() is not implemented') },
+					proc_exit(...args: unknown[]) { throw new Error('proc_exit() is not implemented') },
+					fd_close(...args: unknown[]) { throw new Error('fd_close() is not implemented') },
+					fd_write(...args: unknown[]) { throw new Error('fd_write() is not implemented') },
+					fd_seek(...args: unknown[]) { throw new Error('fd_seek() is not implemented') },
 				}
 			}
 		);
