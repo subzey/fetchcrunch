@@ -46,36 +46,6 @@ export function bytesConcat(...uias: readonly Uint8Array[]): Uint8Array {
 	return concatenated;
 }
 
-/**
- * Iterates over all possible HTML presentation variants:
- * 
- * `<body `, `<Body `, `<bOdy `, ..., `<body\t`, `<Body\t`, ...
- */
-export function htmlVariants(html: string, separators: ReadonlySet<string>): Generator<string, void> {
-	const altSequence: readonly Iterable<string>[] = Array.from(
-		html,
-		(ch) => {
-			if (separators.has(ch)) {
-				return separators;
-			}
-			return new Set([ch, ch.toUpperCase(), ch.toLowerCase()]);
-		}
-	);
-
-	return pickEachVariant('', altSequence, 0);
-}
-
-/** Iterates over all combination of alternative string chunks */
-function * pickEachVariant(prefix: string, altSequence: readonly Iterable<string>[], startingWith: number): Generator<string, void> {
-	if (startingWith >= altSequence.length) {
-		yield prefix;
-	} else {
-		for (const alt of altSequence[startingWith]) {
-			yield * pickEachVariant(prefix + alt, altSequence, startingWith + 1);
-		}
-	}
-}
-
 /** Staring in the attribute context */
 export function findTagEnd(htmlChunk: string): number {
 	const cleanedChunk = htmlChunk.replace(/[^ \t\n\r>]+=("|').*?(\1|$)/g, (s) => 'x'.repeat(s.length));

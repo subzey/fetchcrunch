@@ -1,8 +1,16 @@
-export type Template = Iterable<number | ReadonlySet<number>> | ArrayLike<number | ReadonlySet<number>>;
+import { bytesFromString } from './junkyard.js';
+import type { StringTemplate, StringTemplateVariants } from './template.js';
+
+export type BytesTemplate = (number | BytesTemplateVariants)[];
+
+export type BytesTemplateVariants = Set<number> & {
+	mutuallyExclusiveWith?: BytesTemplateVariants[];
+}
+
 
 interface Match {
 	replaceWith: number;
-	matchedSet: ReadonlySet<number>;
+	matchedSet: BytesTemplateVariants;
 	size: number;
 }
 /**
@@ -21,8 +29,8 @@ interface Match {
  * @param maxDistance Matches more distant than that doesn't count as matches. Default is 32768 that is the max backref distance in DEFLATE
  * @returns bytes
  */
-export function bytesFromTemplate(template: Template, referenceArr: ArrayLike<number>, minRefSize=3, maxDistance=32768): number[] {
-	let templateArr = Array.from(template);
+export function bytesFromTemplate(stringTemplate: StringTemplate, referenceArr: ArrayLike<number>, minRefSize=3, maxDistance=32768): number[] {
+	const templateArr = internalizeTemplate(stringTemplate);
 	while (true) {
 		let bestMatch: Match | null = null;
 		for (let templateOffset = templateArr.length; templateOffset-- > 0;) {
@@ -53,8 +61,8 @@ export function bytesFromTemplate(template: Template, referenceArr: ArrayLike<nu
 	}
 }
 
-function * findMatches(referenceArr: ArrayLike<number>, templateArr: (number | ReadonlySet<number>)[], templateOffset: number, minSize: number, maxDistance: number): Generator<Match> {
-	const anchorSet = templateArr[templateOffset] as ReadonlySet<number>;
+function * findMatches(referenceArr: ArrayLike<number>, templateArr: BytesTemplate, templateOffset: number, minSize: number, maxDistance: number): Generator<Match> {
+	const anchorSet = templateArr[templateOffset] as BytesTemplateVariants;
 	const maxOffset = Math.min(referenceArr.length - 1, maxDistance);
 	for (let referenceOffset = 0; referenceOffset <= maxOffset; referenceOffset++) {
 		if (!anchorSet.has(referenceArr[referenceOffset])) {
@@ -110,9 +118,7 @@ function matchesAt(
 	}
 }
 
-function collapseSet(templateArr: (number | ReadonlySet<number>)[], replaceSet: ReadonlySet<number>, replaceWith: number): void {
-	const replacementMapping: Map<ReadonlySet<number>, ReadonlySet<number>> = new Map();
-
+function collapseSet(templateArr: BytesTemplate, replaceSet: BytesTemplateVariants, replaceWith: number): void {
 	for (let i = 0; i < templateArr.length; i++) {
 		let v = templateArr[i];
 		if (typeof v === 'number') {
@@ -123,15 +129,61 @@ function collapseSet(templateArr: (number | ReadonlySet<number>)[], replaceSet: 
 			templateArr[i] = replaceWith;
 			continue;
 		}
-		if (v.has(replaceWith)) {
-			// Remove this value from other sets
-			// (actually creating a new one, because it's a ReadonlySet)
-			if (!replacementMapping.has(v)) {
-				const patchedSet = new Set(v);
-				patchedSet.delete(replaceWith);
-				replacementMapping.set(v, patchedSet);
-			}
-			templateArr[i] = replacementMapping.get(v) as ReadonlySet<number>;
+	}
+	if (replaceSet.mutuallyExclusiveWith) {
+		for (const otherSet of replaceSet.mutuallyExclusiveWith) {
+			otherSet.delete(replaceWith);
 		}
 	}
+}
+
+
+function internalizeTemplate(stringTemplate: StringTemplate): BytesTemplate {
+	const setMapping: Map<StringTemplateVariants, BytesTemplateVariants> = new Map();
+	const rv: BytesTemplate = [];
+	for (const item of stringTemplate) {
+		if (typeof item === 'string') {
+			rv.push(...bytesFromString(item));
+			continue;
+		}
+
+		let bytesSet = setMapping.get(item);
+		if (bytesSet === undefined) {
+			bytesSet = bytesSetFromStringSet(item);
+			setMapping.set(item, bytesSet);
+		}
+		rv.push(bytesSet);
+	}
+
+	// Restore mutual exclusiveness
+	for (const stringSet of setMapping.keys()) {
+		if (stringSet.mutuallyExclusiveWith === undefined) {
+			continue;
+		}
+		const binarySet = setMapping.get(stringSet)!;
+		for (const referencedStringSet of stringSet.mutuallyExclusiveWith) {
+			const referencedBinarySet = setMapping.get(referencedStringSet);
+			if (referencedBinarySet === undefined) {
+				continue
+			}
+			binarySet.mutuallyExclusiveWith ??= [];
+			binarySet.mutuallyExclusiveWith.push(referencedBinarySet);
+			referencedBinarySet.mutuallyExclusiveWith ??= [];
+			referencedBinarySet.mutuallyExclusiveWith.push(binarySet);
+		}
+	}
+
+	return rv;
+}
+
+function bytesSetFromStringSet(stringSet: Set<string>): Set<number> {
+	const bytesSet: Set<number> = new Set();
+	for (const ch of stringSet) {
+		const charCode = ch.charCodeAt(0);
+		if (ch.length > 1 || charCode > 127) {
+			throw new Error('The template variant should be a basic ASCII character');
+		}
+		bytesSet.add(charCode);
+	}
+	return bytesSet;
 }
