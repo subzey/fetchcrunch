@@ -1,4 +1,7 @@
 import { URL, fileURLToPath } from 'url';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import CssMinimizerPlugin from 'css-minimizer-webpack-plugin';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 import * as Webpack from "webpack"; // For typings only
 
 /** @type {Webpack.Configuration} */
@@ -7,10 +10,12 @@ export default {
 	mode: 'development',
 	devtool: false,
 	entry: [
-		"./main.ts",
+		'./main.ts',
 	],
 	output: {
-		path: fileURLToPath(new URL('../../build/', import.meta.url))
+		publicPath: './',
+		path: fileURLToPath(new URL('../../build/', import.meta.url)),
+		// filename: '[chunkhash].js',
 	},
 	resolve: {
 		extensions: [".ts", ".js"]
@@ -18,16 +23,34 @@ export default {
 	module: {
 		rules: [
 			{
-				test: /\.ts$/,
+				test: /\.ts$/i,
 				loader: "ts-loader"
 			},
 			{
-				test: /\.wasm$/,
+				test: /\.css$/i,
+				use: [
+					MiniCssExtractPlugin.loader,
+					'css-loader',
+				],
+			},
+			{
+				test: /\.wasm$/i,
 				type: 'asset/resource',
 			},
 		]
 	},
+	plugins: [
+		new MiniCssExtractPlugin(),
+		new HtmlWebpackPlugin({
+			filename: 'index.html',
+			template: 'index.html',
+		}),
+	],
 	optimization: {
 		runtimeChunk: false,
+		minimizer: [
+			'...',
+			new CssMinimizerPlugin(),
+		]
 	}
 }

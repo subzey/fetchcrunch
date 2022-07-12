@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>FetchCrunch</title>
+	</head>
+	<body>
+		<header><h1>FetchCrunch</h1></header>
+		<form method="" action="javascript://">
+			<section id="config-section">
+				<details>
+					<summary>Config</summary>
+					<fieldset id="config">
+						<label for="template">Template</label><input id="template" value="" placeholder="&lt;svg onload&gt;" spellcheck="false">
+						<label for="iterations">Zopfli iterations</label><input id="iterations" type="number" min="1" placeholder="50">
+					</fieldset>
+			</section>
+			<section id="input-section">
+				<textarea autofocus id="input" aria-label="Source JavaScript" placeholder="console.log('Hello world!')" spellcheck="false"></textarea>
+				<div id="examples">
+					<button id="paste">Paste from clip</button>
+					<button id="load-jquery">Load example: jQuery</button>
+				</div>
+			</section>
+			<section id="output-section">
+				<button type="submit" id="submit">Crunch!</button>
+				<output></output>
+			</section>
+		</form>
+	</body>
+</html>
