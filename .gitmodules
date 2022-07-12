@@ -1,3 +1,7 @@
 [submodule "zopfli"]
 	path = zopfli
 	url = https://github.com/google/zopfli.git
+[submodule "gh-pages"]
+	path = gh-pages
+	url = ./
+	branch = gh-pages
