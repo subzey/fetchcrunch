@@ -51,7 +51,7 @@ export abstract class FetchCrunchBase {
 			'(',
 				'async ', evaledStringV, '=>{',
 					'for(',
-						readerV, '=(await fetch``).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
+						readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
 						chunkV, '=(await ', readerV, '.read()).value;',
 						evaledStringV, '+=', chunkV,
 					');',

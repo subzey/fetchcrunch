@@ -10,6 +10,7 @@ function crunch(params: { source: string, iterations?: number, template?: string
 		}
 		if (currentWorker === null) {
 			currentWorker = new Worker(
+				/* webpackChunkName: 'crunch-worker' */
 				new URL('./worker', import.meta.url),
 				{ name: 'Crunch worker' }
 			);
@@ -77,7 +78,7 @@ function readInputsFromUI() {
 		throw new Error('Please type or paste something');
 	}
 
-	const template: string | undefined = document.querySelector('#iterations' as 'input')!.value.trim() || undefined;
+	const template: string | undefined = document.querySelector('#template' as 'input')!.value.trim() || undefined;
 	const iterationsStr = document.querySelector('#iterations' as 'input')!.value.trim();
 
 	let iterations: number | undefined = undefined;
@@ -98,8 +99,36 @@ function readInputsFromUI() {
 		output.textContent = 'Crunching...';
 		try {
 			const result = await crunch(readInputsFromUI());
+			const dateCreated = new Date();
 			const blob = new Blob([result], { type: 'text/html;charset=utf-8' });
-			output.textContent = URL.createObjectURL(blob);
+			const blobHref = URL.createObjectURL(blob);
+
+			const link = document.createElement('a');
+			link.target = '_blank';
+			link.textContent = 'Preview';
+			link.href = blobHref;
+			
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.textContent = 'Download';
+			button.addEventListener('click', (e) => {
+				e.preventDefault();
+				const link = document.createElement('a');
+				link.href = blobHref;
+				const basename = [
+					'crunch',
+					`${dateCreated.getFullYear()}-${String(dateCreated.getMonth() + 1).padStart(2, '0')}-${String(dateCreated.getDate()).padStart(2, '0')}`,
+					`${String(dateCreated.getHours()).padStart(2, '0')}-${String(dateCreated.getMinutes()).padStart(2, '0')}-${String(dateCreated.getSeconds()).padStart(2, '0')}`
+				].join('_');
+				link.download = `${basename}.html`;
+				link.click();
+			});
+		
+			output.textContent = `${result.byteLength} bytes. `;
+			output.appendChild(link);
+			output.appendChild(document.createTextNode(' '));
+			output.appendChild(button);
+
 		} catch (e) {
 			output.textContent = '';
 			const message = ((e as Error | ErrorEvent).message) || '';

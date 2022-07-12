@@ -7,15 +7,16 @@ import * as Webpack from "webpack"; // For typings only
 /** @type {Webpack.Configuration} */
 export default {
 	context: fileURLToPath(new URL('.', import.meta.url)),
-	mode: 'development',
+	mode: 'production',
 	devtool: false,
 	entry: [
 		'./main.ts',
 	],
 	output: {
 		publicPath: './',
-		path: fileURLToPath(new URL('../../build/', import.meta.url)),
-		// filename: '[chunkhash].js',
+		path: fileURLToPath(new URL('../../gh-pages/', import.meta.url)),
+		filename: '[name].js',
+		assetModuleFilename: '[name][ext]',
 	},
 	resolve: {
 		extensions: [".ts", ".js"]
@@ -40,7 +41,9 @@ export default {
 		]
 	},
 	plugins: [
-		new MiniCssExtractPlugin(),
+		new MiniCssExtractPlugin({
+			chunkFilename: '[name].css'
+		}),
 		new HtmlWebpackPlugin({
 			filename: 'index.html',
 			template: 'index.html',

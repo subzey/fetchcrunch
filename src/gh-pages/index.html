@@ -6,7 +6,10 @@
 		<title>FetchCrunch</title>
 	</head>
 	<body>
-		<header><h1>FetchCrunch</h1></header>
+		<header>
+			<h1>FetchCrunch</h1>
+			<p><a href="https://github.com/subzey/fetchcrunch" target="_blank">Github</a></p>
+		</header>
 		<form method="" action="javascript://">
 			<section id="config-section">
 				<details>
@@ -22,6 +25,10 @@
 					<button id="paste">Paste from clip</button>
 					<button id="load-jquery">Load example: jQuery</button>
 				</div>
+			</section>
+			<section id="warning">
+				&#x26A0;&#xFE0F; HTML self decompression is based on the Decompression<wbr>Stream API that <strong>is not well supported</strong> yet.
+				Please check the <a href="https://caniuse.com/mdn-api_decompressionstream" target="_blank">browser support</a> before publishing the generated HTML.
 			</section>
 			<section id="output-section">
 				<button type="submit" id="submit">Crunch!</button>

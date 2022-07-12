@@ -13,6 +13,10 @@ html {
 	}
 }
 
+a {
+	color: inherit;
+}
+
 body {
 	margin: 0;
 	min-height: 100%;
@@ -69,9 +73,22 @@ header, #config-section, #output-section {
 	inset: .25em .25em auto auto;
 }
 
+header {
+	padding: .25em;
+	display: flex;
+	flex-flow: row wrap;
+	align-items: baseline;
+}
+
 header h1 {
 	font-size: 2em;
-	margin: .25em 0;
+	margin: 0;
+
+}
+
+header p {
+	margin: 0;
+	margin-inline-start: auto;
 }
 
 #config-section {
@@ -115,4 +132,10 @@ header h1 {
 .error.obsolete {
 	opacity: 0;
 	transition: opacity 1s;
+}
+
+#warning {
+	padding: .5em 1em;
+	background: black;
+	color: yellow;
 }
