@@ -2,6 +2,7 @@
 	"private": true,
 	"type": "module",
 	"name": "fetchcrunch",
+	"description": "A tool to create a self unpacking HTML pages with DEFLATE compressed JS",
 	"version": "1.0.0-beta.2",
 	"license": "MIT",
 	"exports": {
@@ -24,21 +25,11 @@
 	"scripts": {
 		"test": "node test",
 		"build": "tsc -p src/package && node build-tools",
-		"build-pages": "webpack -c src/gh-pages/webpack.config.js",
 		"build-wasm": "emcc -O3 -sSTRICT -sFILESYSTEM=0 -sWASM=1 --no-entry -o artifacts/zopfli-with-dictionary.wasm zopfli/src/zopfli/deflate.c zopfli/src/zopfli/lz77.c zopfli/src/zopfli/cache.c zopfli/src/zopfli/katajainen.c zopfli/src/zopfli/squeeze.c zopfli/src/zopfli/blocksplitter.c zopfli/src/zopfli/hash.c zopfli/src/zopfli/tree.c zopfli/src/zopfli/util.c src/package/zopfli-with-dictionary.c"
 	},
 	"devDependencies": {
 		"@types/node": "^18.0.0",
-		"@types/pako": "^2.0.0",
-		"css-loader": "^6.7.1",
-		"css-minimizer-webpack-plugin": "^4.0.0",
-		"html-webpack-plugin": "^5.5.0",
-		"mini-css-extract-plugin": "^2.6.1",
-		"pako": "^2.0.4",
-		"ts-loader": "^9.3.1",
-		"typescript": "^4.7.4",
-		"webpack": "^5.73.0",
-		"webpack-cli": "^4.10.0"
+		"typescript": "^4.7.4"
 	},
 	"dependencies": {
 		"parse5": "^7.0.0"

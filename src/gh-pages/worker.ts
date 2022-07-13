@@ -1,9 +1,9 @@
 /// <reference lib="webworker"/>
 
 import { inflateRaw } from 'pako';
-import { FetchCrunchBase } from '../../dist/base.js';
-import { WasmZopfliBase } from '../../dist/wasm-zopfli-base';
-import wasmUrl from '../../dist/zopfli-with-dictionary.wasm';
+import { FetchCrunchBase } from '../../package/base.js';
+import { WasmZopfliBase } from '../../package/wasm-zopfli-base';
+import wasmUrl from '../../package/zopfli-with-dictionary.wasm';
 
 class WasmZopfliBrowser extends WasmZopfliBase {
 	protected async _loadWasmBinary(): Promise<Uint8Array> {
