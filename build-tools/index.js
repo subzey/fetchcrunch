@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { resolve } from 'node:path';
 
 const pathFromProjectRoot = resolve.bind(null, fileURLToPath(new URL('../', import.meta.url)));
+const pathFromDist = resolve.bind(null, fileURLToPath(new URL('../package', import.meta.url)));
 
 let pkgMetaPromise = (async function processPackageJson() {
 	const pkgMeta = JSON.parse(
@@ -15,7 +16,7 @@ let pkgMetaPromise = (async function processPackageJson() {
 })();
 
 (async function copyPackageJson() {
-	await writeFile(pathFromProjectRoot('dist/package.json'), JSON.stringify(await pkgMetaPromise, null, 2));
+	await writeFile(pathFromDist('package.json'), JSON.stringify(await pkgMetaPromise, null, 2));
 })();
 
 (async function copyReadme() {
@@ -23,7 +24,7 @@ let pkgMetaPromise = (async function processPackageJson() {
 		pathFromProjectRoot('README.md'),
 		{ encoding: 'utf-8' }
 	);
-	await writeFile(pathFromProjectRoot('dist/README.md'), readme);
+	await writeFile(pathFromDist('README.md'), readme);
 })();
 
 (async function copyWasm() {
@@ -31,7 +32,7 @@ let pkgMetaPromise = (async function processPackageJson() {
 		pathFromProjectRoot('artifacts/zopfli-with-dictionary.wasm')
 	);
 	await writeFile(
-		pathFromProjectRoot('dist/zopfli-with-dictionary.wasm'),
+		pathFromDist('zopfli-with-dictionary.wasm'),
 		wasmBinary
 	);
 })();

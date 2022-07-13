@@ -2,7 +2,7 @@
 	"private": true,
 	"type": "module",
 	"name": "fetchcrunch",
-	"version": "1.0.0-beta.1",
+	"version": "1.0.0-beta.2",
 	"license": "MIT",
 	"exports": {
 		"./base": "./base.js",
@@ -10,6 +10,7 @@
 			"node": "./node.js"
 		}
 	},
+	"sideEffects": false,
 	"bin": "./cli.js",
 	"author": {
 		"name": "Anton Khlynovskiy",
