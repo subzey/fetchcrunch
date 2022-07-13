@@ -39,6 +39,6 @@ let pkgMetaPromise = (async function processPackageJson() {
 
 (async function makeExecutable() {
 	const pkgMeta = await pkgMetaPromise;
-	const toBeExecutable = pathFromProjectRoot('dist', pkgMeta.bin);
+	const toBeExecutable = pathFromDist(pkgMeta.bin);
 	await chmod(toBeExecutable, 0o775);
 })();
