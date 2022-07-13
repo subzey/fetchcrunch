@@ -12,6 +12,10 @@ Unlike ZPNG / JsExe, FetchCrunch is using more modern browser API, [`Compression
 
 `◤◢◤◢◤◢◤◢◤◢ WARNING ◤◢◤◢◤◢◤◢◤◢`
 
+## Online
+
+[Online generator](https://subzey.github.io/fetchcrunch/)
+
 ## Node CLI
 
 ```sh
@@ -29,10 +33,6 @@ await new FetchCrunchNode().crunch( someJavaScriptCode );
 ```
 
 FetchCrunch is created to be configurable. Please import and extend `FetchCrunchNode` and `FetchCrunchBase` for your purposes.
-
-## Online
-
-Will be here once I finish it.
 
 ## Legal stuff
 
