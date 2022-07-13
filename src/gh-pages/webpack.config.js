@@ -51,6 +51,7 @@ export default {
 	],
 	optimization: {
 		runtimeChunk: false,
+		chunkIds: 'deterministic',
 		minimizer: [
 			'...',
 			new CssMinimizerPlugin(),
