@@ -69,7 +69,9 @@ export abstract class FetchCrunchBase {
 	}
 
 	protected _generateLeadIn(template: StringTemplate): Uint8Array {
-		const zeroLengthFinalBlock = Uint8Array.of(0x00, 0x00, 0xff, 0xff);
+		const testByte1 = 0b10101010;
+		const testByte2 = 0b01010101;
+		const surrogateFinalBlock = Uint8Array.of(0x02, 0x00, 0xfd, 0xff, testByte1, testByte2);
 		let bestBytes: Uint8Array | null = null;
 		let bestFinalizedSize = Infinity;
 
@@ -94,7 +96,7 @@ export abstract class FetchCrunchBase {
 						1, 0, 0,
 					]),
 					// 4 bytes of a block-type-0 payload length
-					zeroLengthFinalBlock
+					surrogateFinalBlock
 				);
 
 				if (finalizedDeflateBinary.byteLength >= bestFinalizedSize) {
@@ -106,7 +108,11 @@ export abstract class FetchCrunchBase {
 				try {
 					// Should throw if it's an invalid DEFLATE-raw
 					const decompressedJunk = this._binaryFromDeflateRaw(finalizedDeflateBinary);
-					if (!this._isDecompressedJunkOkay(decompressedJunk)) {
+					if (decompressedJunk[decompressedJunk.byteLength - 2] !== testByte1 || decompressedJunk[decompressedJunk.byteLength - 1] !== testByte2) {
+						// A guard against too forgiving decompressors
+						continue;
+					}
+					if (!this._isDecompressedJunkOkay(decompressedJunk.subarray(0, decompressedJunk.byteLength - 2))) {
 						continue;
 					}
 				} catch (e) {
