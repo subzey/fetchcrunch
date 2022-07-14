@@ -112,6 +112,11 @@ export abstract class WasmZopfliBase {
 					fd_close(...args: unknown[]) { throw new Error('fd_close() is not implemented') },
 					fd_write(...args: unknown[]) { throw new Error('fd_write() is not implemented') },
 					fd_seek(...args: unknown[]) { throw new Error('fd_seek() is not implemented') },
+				},
+				env: {
+					emscripten_notify_memory_growth(...args: unknown[]) {
+						// Yeah, whatever
+					}
 				}
 			}
 		);

@@ -34,6 +34,11 @@ async function smoke() {
 	}
 }
 
+async function jumbo() {
+	/// should not choke on large inputs
+	await new FetchCrunchNode().crunch(Buffer.alloc(1024 * 1024).fill(49));
+}
+
 async function inference() {
 	for (const varname of ['a', 'b', 'c']) {
 		const input = `async ${varname}=>{`;
@@ -58,6 +63,7 @@ async function inference() {
 
 async function main() {
 	await smoke();
+	await jumbo();
 	await inference();
 }
 
