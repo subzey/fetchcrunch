@@ -1,5 +1,6 @@
 {
 	"private": true,
+	"sideEffects": ["*.css"],
 	"type": "module",
 	"devDependencies": {
 		"@types/pako": "^2.0.0",
