@@ -15,9 +15,9 @@ interface IntermediateRepresentationItem {
 	value: string;
 }
 
-export type IR = IntermediateRepresentationItem[];
+export type IR = readonly IntermediateRepresentationItem[];
 
-export function irFromHtml(html: string): { ir: IR, ids: Set<string> } {
+export function irFromHtml(html: string): { ir: IR, ids: ReadonlySet<string> } {
 	const doc: DefaultTreeAdapterMap['document'] = parse(html, { sourceCodeLocationInfo: true });
 	return {
 		ir: Array.from(irFromConcreteTree(html, doc)),

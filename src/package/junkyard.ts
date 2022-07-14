@@ -61,3 +61,19 @@ let textEncoder = new TextEncoder();
 export function bytesFromString(str: string): Uint8Array {
 	return textEncoder.encode(str);
 }
+
+/**
+ * A byte array of charCodes - if all of them are <= 255
+ */
+export function charCodeBytesFromString(str: string): Uint8Array | null {
+	const len = str.length;
+	const rv = new Uint8Array(len);
+	for (let i = 0; i < len; i++) {
+		const charCode = str.charCodeAt(i);
+		if (charCode > 0xFF) {
+			return null;
+		}
+		rv[i] = charCode;
+	}
+	return rv;
+}

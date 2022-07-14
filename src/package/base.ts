@@ -1,15 +1,19 @@
-import { bitsFromBytes, bytesFromBits, bytesConcat, findTagEnd, bytesFromString, stringFromBytes } from "./junkyard.js";
+import { bitsFromBytes, bytesFromBits, bytesConcat, findTagEnd, bytesFromString, stringFromBytes, charCodeBytesFromString } from "./junkyard.js";
 import { bytesFromTemplate } from "./payload-dependent-template.js";
 import { StringTemplate, StringTemplateVariants, irFromHtml, templatesFromIr, iterateThroughTemplate } from "./template.js";
 
-export interface Options {
-	head?: string;
-	tail?: string;
-}
+export interface AssemblyParams {
+	leadIn: Uint8Array;
+	bootstrap: Uint8Array;
+	tail: Uint8Array;
+	payload: Uint8Array;
 
-interface AssemblyVariant {
 	literalNewline: boolean;
 	literalIncludesTail: boolean;
+	useCharCodes: boolean;
+	
+	leadInDecompressedSize: number;
+	bestSize: number;
 }
 
 /**
@@ -25,7 +29,7 @@ export abstract class FetchCrunchBase {
 		return '<svg onload>';
 	}
 
-	protected _onloadAttribute(reservedIdentifierNames: ReadonlySet<string>): StringTemplate {
+	protected _onloadAttribute(useCharCodes: boolean, options: { reservedIdentifierNames: ReadonlySet<string> }): StringTemplate {
 		const identifierNames = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_';
 		const identifiers: StringTemplateVariants[] = [
 			new Set('s' + identifierNames),
@@ -33,7 +37,7 @@ export abstract class FetchCrunchBase {
 			new Set('c' + identifierNames),
 		];
 		for (const identifier of identifiers) {
-			for (const reservedIdentifierName of reservedIdentifierNames) {
+			for (const reservedIdentifierName of options.reservedIdentifierNames) {
 				identifier.delete(reservedIdentifierName);
 			}
 			for (const otherIdentifier of identifiers) {
@@ -47,14 +51,36 @@ export abstract class FetchCrunchBase {
 
 		const [evaledStringV, readerV, chunkV] = identifiers;
 
+		/**
+		 * Decode data as the array of charCodes.
+		 * This code is shorter, but can be used only for short strings of codepoints U+0000 .. U+00FF.
+		 * 
+		 * Massive thanks to [Kang Seonghoon](https://twitter.com/senokay) for this method!
+		 */
+		const readAsCharCodes = [
+			'for(',
+				readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).getReader();',
+				chunkV, '=(await ', readerV, '.read()).value;',
+				evaledStringV, '+=String.fromCharCode(...', chunkV, ')',
+			');',
+		];
+
+		/**
+		 * Decode data as UTF-8.
+		 * Longer code, but supports the entire Unicode and strings of virtually any length.
+		 */
+		const readAsUtf8 = [
+			'for(',
+				readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
+				chunkV, '=(await ', readerV, '.read()).value;',
+				evaledStringV, '+=', chunkV,
+			');',
+		];
+
 		return [
 			'(',
 				'async ', evaledStringV, '=>{',
-					'for(',
-						readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
-						chunkV, '=(await ', readerV, '.read()).value;',
-						evaledStringV, '+=', chunkV,
-					');',
+					...(useCharCodes ? readAsCharCodes : readAsUtf8),
 					'eval(', evaledStringV, ')',
 				'}',
 			')`//`',
@@ -68,11 +94,19 @@ export abstract class FetchCrunchBase {
 		return new Set(['\r', '\n', '\u2028', '\u2029']);
 	}
 
-	protected _generateLeadIn(template: StringTemplate): Uint8Array {
+	/**
+	 * A call stack size we expect from a browser
+	 */
+	protected _maxCallStackSize(): number {
+		return 65000;
+	}
+
+	protected _generateLeadIn(template: StringTemplate): { leadIn: Uint8Array, leadInDecompressedSize: number } {
 		const testByte1 = 0b10101010;
 		const testByte2 = 0b01010101;
 		const surrogateFinalBlock = Uint8Array.of(0x02, 0x00, 0xfd, 0xff, testByte1, testByte2);
 		let bestBytes: Uint8Array | null = null;
+		let bestDecompressedSize = Infinity;
 		let bestFinalizedSize = Infinity;
 
 		for (const variant of iterateThroughTemplate(template)) {
@@ -99,12 +133,13 @@ export abstract class FetchCrunchBase {
 					surrogateFinalBlock
 				);
 
-				if (finalizedDeflateBinary.byteLength >= bestFinalizedSize) {
+				if (finalizedDeflateBinary.byteLength > bestFinalizedSize) {
 					// Won't call a (potentially heavy) decompressor if this variant
 					// is not better than the one we aleady have.
 					continue;
 				}
 
+				let decompressedLeadIn: Uint8Array;
 				try {
 					// Should throw if it's an invalid DEFLATE-raw
 					const decompressedJunk = this._binaryFromDeflateRaw(finalizedDeflateBinary);
@@ -112,13 +147,21 @@ export abstract class FetchCrunchBase {
 						// A guard against too forgiving decompressors
 						continue;
 					}
-					if (!this._isDecompressedJunkOkay(decompressedJunk.subarray(0, decompressedJunk.byteLength - 2))) {
+					decompressedLeadIn = decompressedJunk.subarray(0, decompressedJunk.byteLength - 2);
+					if (!this._isDecompressedLeadInOkay(decompressedLeadIn)) {
 						continue;
 					}
 				} catch (e) {
 					// No luck
 					continue;
 				}
+
+				if (decompressedLeadIn.byteLength >= bestDecompressedSize) {
+					// Prefer the shorter decompressed size
+					continue;
+				}
+
+				// Commit
 
 				bestBytes = bytesFromBits([
 					0, 1, 0,
@@ -129,6 +172,7 @@ export abstract class FetchCrunchBase {
 					0, 0, 0
 				]);
 				bestFinalizedSize = finalizedDeflateBinary.byteLength;
+				bestDecompressedSize = decompressedLeadIn.byteLength;
 			}
 		}
 
@@ -136,11 +180,14 @@ export abstract class FetchCrunchBase {
 			throw new Error(`Could not generate a valid lead-in from this template`);
 		}
 
-		return bestBytes;
+		return {
+			leadIn: bestBytes,
+			leadInDecompressedSize: bestDecompressedSize,
+		};
 	}
 
 	/** Make sure the decompressed junk won't termainate the // comment early */
-	protected _isDecompressedJunkOkay(decompressedJunk: Uint8Array): boolean {
+	protected _isDecompressedLeadInOkay(decompressedJunk: Uint8Array): boolean {
 		const jsNewlines = this._jsNewlines();
 		const decompressedJunkAsString = new TextDecoder().decode(decompressedJunk);
 		for (const jsNewline of jsNewlines) {
@@ -151,95 +198,134 @@ export abstract class FetchCrunchBase {
 		return true;
 	}
 
-	protected * _assemblyVariants(): Iterable<AssemblyVariant> {
-		for (let literalNewline of [true, false]) {
-			for (let literalIncludesTail of [true, false]) {
-				yield {
-					literalNewline,
-					literalIncludesTail,
-				}
-			}
-		}
-	}
-
-	protected async _assemble(leadIn: Uint8Array, bootstrap: Uint8Array, tail: Uint8Array, payload: Uint8Array) {
+	protected async _assemble(
+		{
+			leadIn, bootstrap, tail, payload,
+			literalIncludesTail, literalNewline, useCharCodes,
+			bestSize, leadInDecompressedSize,
+		}: AssemblyParams,
+	): Promise<Uint8Array | null> {
 		const newlineBytes = Uint8Array.of(0x0A);
 		const tailAsString = stringFromBytes(tail);
 
-		let bestResult: Uint8Array | null = null;
-
-		for (const assemblyVariant of this._assemblyVariants()) {
-			if (!assemblyVariant.literalIncludesTail && tail.length > 1) {
-				// There's no hope something longer would be generated at random
-				continue;
-			}
-
-			const chunks: Uint8Array[] = [bootstrap];
-			if (assemblyVariant.literalIncludesTail) {
-				chunks.push(tail);
-			}
-			if (assemblyVariant.literalNewline) {
-				chunks.push(newlineBytes);
-			}
-
-			const literalBlockContent = bytesConcat(...chunks);
-
-			const blockHeader = Uint8Array.of(
-				literalBlockContent.byteLength & 0xff, literalBlockContent.byteLength >>> 8,
-				~literalBlockContent.byteLength & 0xff, ~literalBlockContent.byteLength >>> 8,
-			);
-			if (blockHeader.includes(0x3e)) {
-				// Block header contains ">" and is closing the tag prematurely
-				continue;
-			}
-
-			const literalBlock = bytesConcat(blockHeader, literalBlockContent);
-
-			const stuffToCompress = assemblyVariant.literalNewline ? payload : bytesConcat(newlineBytes, payload);
-			// We're super-lazy with the compression as it is really heavy
-			const compressed = await this._deflateRawFromBinary(stuffToCompress, literalBlock);
-
-			if (bestResult !== null && literalBlock.byteLength + compressed.byteLength > bestResult.byteLength) {
-				continue;
-			}
-
-			if (!assemblyVariant.literalIncludesTail) {
-				const compressedAsString = new TextDecoder().decode(compressed);
-				const tagEndIndex = findTagEnd(compressedAsString);
-				if (tagEndIndex === -1 || !compressedAsString.slice(tagEndIndex).startsWith(tailAsString)) {
-					continue;
-				}
-			}
-
-			bestResult = bytesConcat(leadIn, literalBlock, compressed);
+		if (!literalIncludesTail && tail.length > 1) {
+			// There's no hope something longer would be generated at random
+			return null;
 		}
 
-		if (bestResult === null) {
-			throw new Error('Could not generate bootstrap');
+		const chunks: Uint8Array[] = [bootstrap];
+		if (literalIncludesTail) {
+			chunks.push(tail);
+		}
+		if (literalNewline) {
+			chunks.push(newlineBytes);
 		}
 
-		return bestResult;
+		const literalBlockContent = bytesConcat(...chunks);
+
+		const blockHeader = Uint8Array.of(
+			literalBlockContent.byteLength & 0xff, literalBlockContent.byteLength >>> 8,
+			~literalBlockContent.byteLength & 0xff, ~literalBlockContent.byteLength >>> 8,
+		);
+		if (blockHeader.includes(0x3e)) {
+			// Block header contains ">" and is closing the tag prematurely
+			return null;
+		}
+
+		const literalBlock = bytesConcat(blockHeader, literalBlockContent);
+
+		const stuffToCompress = literalNewline ? payload : bytesConcat(newlineBytes, payload);
+
+		if (useCharCodes) {
+			// Expect the decompressed data to fit in the call stack
+			const uncompressedSize = leadInDecompressedSize + literalBlockContent.byteLength + stuffToCompress.byteLength;
+			if (uncompressedSize > this._maxCallStackSize()) {
+				return null;
+			}
+		}
+
+		// We're super-lazy with the compression as it is really heavy
+		const compressed = await this._deflateRawFromBinary(stuffToCompress, literalBlock);
+
+		if (literalBlock.byteLength + compressed.byteLength >= bestSize) {
+			// Return early
+			return null;
+		}
+
+		if (!literalIncludesTail) {
+			// Expect the ">" to appear in the compressed binary at pure chance
+			const compressedAsString = new TextDecoder().decode(compressed);
+			const tagEndIndex = findTagEnd(compressedAsString);
+			if (tagEndIndex === -1 || !compressedAsString.slice(tagEndIndex).startsWith(tailAsString)) {
+				return null;
+			}
+		}
+
+		return bytesConcat(leadIn, literalBlock, compressed);
 	}
 
 	public async crunch(payload: string | Uint8Array): Promise<Uint8Array>;
 	// Overload for the sick sad untyped JavaScript world
 	public async crunch(payload: unknown): Promise<Uint8Array> {
-		let payloadBytes: Uint8Array;
+		let payloadAsString: string | undefined;
+		let payloadAsUtf8Bytes: Uint8Array | null = null;
+
 		if (typeof payload === 'string') {
-			payloadBytes = new TextEncoder().encode(payload);
+			payloadAsString = payload;
 		} else if (payload instanceof Uint8Array) {
-			payloadBytes = payload;
+			payloadAsUtf8Bytes = payload;
 		} else {
 			throw new TypeError('crunch() accepts only strings and Uint8Array instances');
 		}
 
 		const { ir, ids } = irFromHtml(this._htmlTemplate());
-		const onloadTemplate = this._onloadAttribute(ids);
-		const templates = templatesFromIr(ir, onloadTemplate);
-		const leadIn = this._generateLeadIn(templates.templateHead);
-		const bootstrap = Uint8Array.from(bytesFromTemplate(templates.templateMid, payloadBytes));
-		const tail = Uint8Array.from(bytesFromTemplate(templates.templateTail, payloadBytes));
 
-		return this._assemble(leadIn, bootstrap, tail, payloadBytes);
+		let bestOutput: Uint8Array | null = null;
+
+		for (const useCharCodes of [true, false]) {
+			let payloadBytes: Uint8Array | null = null;
+			if (useCharCodes) {
+				payloadAsString ??= stringFromBytes(payloadAsUtf8Bytes!);
+				if (payloadAsString.length >= this._maxCallStackSize()) {
+					// The payload is too long, even without bootstrap
+					continue;
+				}
+				payloadBytes = charCodeBytesFromString(payloadAsString);
+				if (payloadBytes === null) {
+					// Not all codePoints could be represented
+					continue;
+				}
+			} else {
+				payloadAsUtf8Bytes ??= bytesFromString(payloadAsString!);
+				payloadBytes = payloadAsUtf8Bytes;
+			}
+
+			const onloadTemplate = this._onloadAttribute(useCharCodes, { reservedIdentifierNames: ids });
+			const templates = templatesFromIr(ir, onloadTemplate);
+			const { leadIn, leadInDecompressedSize } = this._generateLeadIn(templates.templateHead);
+			const bootstrap = Uint8Array.from(bytesFromTemplate(templates.templateMid, payloadBytes));
+			const tail = Uint8Array.from(bytesFromTemplate(templates.templateTail, payloadBytes));
+
+			for (let literalNewline of [true, false])
+			for (let literalIncludesTail of [true, false]) {
+				const bestSize: number = (bestOutput === null ? Infinity : bestOutput.byteLength);
+				const output = await this._assemble({
+					leadIn, bootstrap, tail,
+					payload: payloadBytes,
+					literalIncludesTail, literalNewline, useCharCodes,
+					leadInDecompressedSize,
+					bestSize,
+				});
+
+				bestOutput = output ?? bestOutput;
+			}
+
+			if (bestOutput !== null) {
+				// Retrying with a longer bootstrap would be a waste of time
+				return bestOutput;
+			}
+		}
+
+		throw new Error('Could not generate bootstrap');
 	}
 }

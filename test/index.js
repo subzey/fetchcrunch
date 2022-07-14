@@ -61,10 +61,64 @@ async function inference() {
 	}
 }
 
+function usesCharCodeBootstrap(crunched) {
+	return Buffer.from(crunched).toString().includes('String.fromCharCode(');
+}
+
+async function stringDecoding() {
+	const maxCallStackSize = 1000;
+	class WithLimitedCallStack extends FetchCrunchNode {
+		_maxCallStackSize() {
+			return maxCallStackSize;
+		}
+	}
+	const fetchcrunch = new WithLimitedCallStack();
+
+	let basePayloadLength = 100; // Start with a 2x undershoot
+	{
+		const crunched = await fetchcrunch.crunch('0'.repeat(basePayloadLength));
+		const actualDecompressedSize = inflateRawSync(crunched).byteLength;
+		// Make the payload length near the call stack size boundary
+		basePayloadLength -= (actualDecompressedSize - maxCallStackSize);
+	}
+
+	for (let delta = 2; delta >= -2; delta--) {
+		const payloadLength = basePayloadLength + delta;
+		const crunched = await fetchcrunch.crunch('0'.repeat(payloadLength));
+		const actualDecompressedSize = inflateRawSync(crunched).byteLength;
+
+		if (actualDecompressedSize > maxCallStackSize) {
+			if (usesCharCodeBootstrap(crunched)) {
+				throw new Error('The TextDecoder bootstrap should be used if compressed size > max call stack size');
+			}
+		} else {
+			if (!usesCharCodeBootstrap(crunched)) {
+				throw new Error('The charCode bootstrap should be used if compressed size <= max call stack size');
+			}
+		}
+	}
+
+	{ // charCodes in range 0..255
+		const inRange = String.fromCharCode(...Array.from(Array(256), (_, i) => i));
+
+		if (!usesCharCodeBootstrap(await fetchcrunch.crunch(inRange))) {
+			throw new Error('The charCode bootstrap should be used for charCodes 0..255.');
+		}
+	}
+
+	{ // charCodes in range 1..256
+		const outOfRange = String.fromCharCode(...Array.from(Array(256), (_, i) => i + 1));
+		if (usesCharCodeBootstrap(await fetchcrunch.crunch(outOfRange))) {
+			throw new Error('The TextDecoder bootstrap should be used for charCodes > 255.');
+		}
+	}
+}
+
 async function main() {
 	await smoke();
 	await jumbo();
 	await inference();
+	await stringDecoding();
 }
 
 main().then(
