@@ -15,6 +15,8 @@ class WasmZopfliBrowser extends WasmZopfliBase {
 	}
 }
 
+let singletonDeflater: WasmZopfliBrowser | null = null;
+
 class FetchCrunchBrowser extends FetchCrunchBase {
 	private _iterations: number | undefined;
 	private _template: string | undefined;
@@ -31,8 +33,8 @@ class FetchCrunchBrowser extends FetchCrunchBase {
 		return inflateRaw(compressed);
 	}
 	protected _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Promise<Uint8Array> {
-		const compressor = new WasmZopfliBrowser(this._iterations);
-		return compressor.deflateRaw(source, dictionary);
+		singletonDeflater ??= new WasmZopfliBrowser();
+		return singletonDeflater.deflateRaw(source, { dictionary, numIterations: this._iterations });
 	}
 }
 
