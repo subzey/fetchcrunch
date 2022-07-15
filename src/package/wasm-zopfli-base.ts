@@ -20,19 +20,35 @@ interface WasmExports {
 	): void;
 }
 
+export interface DeflateRawOptions {
+	/**
+	 * A dictionary to use.
+	 * This data won't be compressed, but the compressor may use it to make backreferences.
+	 */
+	dictionary?: Uint8Array;
+	/**
+	 * Number of zopfli iterations
+	 */
+	numIterations?: number;
+}
+
 export abstract class WasmZopfliBase {
-	private _numIterations: number;
 	private _wasmExports: Promise<WasmExports>;
 	private _outPtrPtr?: number;
 
 	protected abstract _loadWasmBinary(): Promise<Uint8Array>;
 
-	constructor(numIterations=15) {
-		this._numIterations = numIterations;
+	constructor() {
 		this._wasmExports = this._loadWasm();
 	}
 
-	public async deflateRaw(input: Uint8Array, dictionary = new Uint8Array(0)): Promise<Uint8Array> {
+	public async deflateRaw(
+		input: Uint8Array,
+		{
+			dictionary = new Uint8Array(0),
+			numIterations = 15,
+		}: DeflateRawOptions
+	): Promise<Uint8Array> {
 		if (input.byteLength === 0) {
 			// We don't need zopfli to compress an empty file
 			return Uint8Array.of(3, 0);
@@ -61,7 +77,7 @@ export abstract class WasmZopfliBase {
 		}
 
 		compress(
-			this._numIterations,
+			numIterations,
 			inPtr, dictionary.byteLength, inSize,
 			bpPtr,
 			outPtrPtr, outSizePtr

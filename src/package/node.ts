@@ -15,7 +15,7 @@ export class FetchCrunchNode extends FetchCrunchBase {
 	}
 
 	protected _deflateRawFromBinary(input: Uint8Array, dictionary: Uint8Array): Promise<Uint8Array> {
-		this._deflater ??= new WasmZopfliNode(this._zopfliIterations());
-		return this._deflater.deflateRaw(input, dictionary);
+		this._deflater ??= new WasmZopfliNode();
+		return this._deflater.deflateRaw(input, { dictionary, numIterations: this._zopfliIterations() });
 	}
 }
