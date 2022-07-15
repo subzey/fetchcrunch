@@ -4,6 +4,8 @@ import { FetchCrunchBase } from "./base.js";
 import { WasmZopfliNode } from "./wasm-zopfli-node.js";
 
 export class FetchCrunchNode extends FetchCrunchBase {
+	private _deflater: WasmZopfliNode | null = null;
+
 	protected _zopfliIterations(): number {
 		return 50;
 	}
@@ -13,9 +15,7 @@ export class FetchCrunchNode extends FetchCrunchBase {
 	}
 
 	protected _deflateRawFromBinary(input: Uint8Array, dictionary: Uint8Array): Promise<Uint8Array> {
-		// TODO: Make reusable
-		// Current implementation asserts in AddLZ77Data: ll_length[litlen] > 0 if called twice
-		const deflater = new WasmZopfliNode(this._zopfliIterations());
-		return deflater.deflateRaw(input, dictionary);
+		this._deflater ??= new WasmZopfliNode(this._zopfliIterations());
+		return this._deflater.deflateRaw(input, dictionary);
 	}
 }

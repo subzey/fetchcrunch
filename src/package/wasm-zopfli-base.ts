@@ -42,15 +42,23 @@ export abstract class WasmZopfliBase {
 		const outPtrPtr = this._outPtrPtr ??= allocBuf(9); // Never freed
 		const outSizePtr = outPtrPtr + 4;
 		const bpPtr = outPtrPtr + 8;
+		{ // Reset variables
+			const dataView = new DataView(memory.buffer);
+			// Just in case
+			dataView.setUint32(outPtrPtr, 0, true);
+			// An in-out variable, should be zeroed out
+			dataView.setUint32(outSizePtr, 0, true);
+			// An in-out variable, should be zeroed out
+			dataView.setUint8(bpPtr, 0);
+		}
 
 		const inSize = input.byteLength + dictionary.byteLength;
 		const inPtr = allocBuf(inSize);
-		const memorySlice = new Uint8Array(memory.buffer, inPtr, inSize);
-		memorySlice.set(dictionary, 0);
-		memorySlice.set(input, dictionary.byteLength);
-
-		// Reset bit pointer
-		new Uint8Array(memory.buffer, bpPtr, 1)[0] = 0;
+		{ // Set dictionary + data
+			const memorySlice = new Uint8Array(memory.buffer, inPtr, inSize);
+			memorySlice.set(dictionary, 0);
+			memorySlice.set(input, dictionary.byteLength);
+		}
 
 		compress(
 			this._numIterations,
@@ -59,8 +67,9 @@ export abstract class WasmZopfliBase {
 			outPtrPtr, outSizePtr
 		);
 		
-		// The memory.buffer may be a new ArrayBuffer after the compress() call.
-		// (Wasm modules can resize its memory but ArrayBuffers are not resizable)
+		// DO NOT try to reuse the dataView from above.
+		// The memory may have been resized (and most probably it was)
+		// so the previous memory.buffer value is no longer valid
 		const dataView = new DataView(memory.buffer);
 		const outPtr = dataView.getUint32(outPtrPtr, true);
 		const outSize = dataView.getUint32(outSizePtr, true);
@@ -71,9 +80,9 @@ export abstract class WasmZopfliBase {
 
 		this._wakaPatch(result, dataView.getUint8(bpPtr));
 
-		freeBuf(inPtr);
 		freeBuf(outPtr); // Zopfli expect us to free the buffer it created
-
+		freeBuf(inPtr);
+		
 		return result;
 	}
 
