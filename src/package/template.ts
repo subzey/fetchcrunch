@@ -1,4 +1,4 @@
-import { parse, parseFragment, DefaultTreeAdapterMap } from 'parse5';
+import { Tokenizer, parseFragment, DefaultTreeAdapterMap } from 'parse5';
 
 export type StringTemplateVariants = Set<string> & {
 	mutuallyExclusiveWith?: StringTemplateVariants[];
@@ -17,12 +17,63 @@ interface IntermediateRepresentationItem {
 
 export type IR = readonly IntermediateRepresentationItem[];
 
+export const BOOTSTRAP_ATTR_VALUE = '__bootstrap__';
+
 export function irFromHtml(html: string): { ir: IR, ids: ReadonlySet<string> } {
-	const doc: DefaultTreeAdapterMap['document'] = parse(html, { sourceCodeLocationInfo: true });
-	return {
-		ir: Array.from(irFromConcreteTree(html, doc)),
-		ids: new Set(collectIds(doc)),
-	};
+	const ir: IntermediateRepresentationItem[] = [];
+	const ids: Set<string> = new Set();
+
+	/**
+	 * Anything but the tags is just copied as is
+	 */
+	function copyAsIs(token: { location: null | { startOffset: number, endOffset: number}}) {
+		if (!token.location) {
+			throw new Error('Token should include its location');
+		}
+		ir.push({
+			kind: 'unknown',
+			value: html.slice(token.location.startOffset, token.location.endOffset),
+		});
+	}
+
+	const tokenizer = new Tokenizer(
+		{ sourceCodeLocationInfo: true },
+		{
+			onCharacter: copyAsIs,
+			onComment: copyAsIs,
+			onDoctype: copyAsIs,
+			onStartTag(token) {
+				ir.push({ kind: 'tag-name-or-attr-name', value: '<' + token.tagName });
+				for (const attr of token.attrs) {
+					if (attr.name === 'id' && attr.value) {
+						ids.add(attr.value);
+					}
+
+					ir.push({ kind: 'attr-separator', value: ' '});
+					if (attr.value === BOOTSTRAP_ATTR_VALUE) {
+						ir.push({ kind: 'tag-name-or-attr-name', value: attr.name + '=' });
+						ir.push({ kind: 'onload-attr-value', value: attr.value });
+					} else if (attr.value) {
+						ir.push({ kind: 'tag-name-or-attr-name', value: attr.name + '=' });
+						ir.push({ kind: 'attr-value', value: attr.value });
+					} else {
+						ir.push({ kind: 'tag-name-or-attr-name', value: attr.name });
+					}
+				}
+				ir.push({ kind: 'close-waka', value: '>' });
+			},
+			onEndTag(token) {
+				ir.push({ kind: 'tag-name-or-attr-name', value: '</' + token.tagName });
+				ir.push({ kind: 'close-waka', value: '>' });
+			},
+			onEof() { /* nothing */ },
+			onWhitespaceCharacter: copyAsIs,
+			onNullCharacter: copyAsIs
+		}
+	);
+	tokenizer.write(html, true);
+
+	return { ir, ids };
 }
 
 export function templatesFromIr(ir: IR, onloadTemplate: StringTemplate): {
@@ -62,98 +113,6 @@ export function templatesFromIr(ir: IR, onloadTemplate: StringTemplate): {
 		templateMid: stringTemplateFromIr(mid, onloadTemplate),
 		templateTail: stringTemplateFromIr(tail)
 	};
-}
-
-function * collectIds(node: DefaultTreeAdapterMap['node']): Iterable<string> {
-	if ('tagName' in node) {
-		for (const { name, value } of node.attrs) {
-			if (name === 'id') {
-				yield value;
-			}
-		}
-	}
-	if ('childNodes' in node) {
-		for (const child of node.childNodes) {
-			yield * collectIds(child);
-		}
-	}
-}
-
-function * irFromConcreteTree(html: string, node: DefaultTreeAdapterMap['node'] | DefaultTreeAdapterMap['parentNode']): Iterable<IntermediateRepresentationItem> {
-	if (('tagName' in node) && node.sourceCodeLocation) {
-		// An element that was mentioned in the template (not implicitly created)
-		yield {
-			kind: 'tag-name-or-attr-name',
-			value: '<' + node.tagName,
-		}
-		for (const attr of node.attrs) {
-			yield {
-				kind: 'attr-separator',
-				value: ' ',
-			}
-			yield {
-				kind: 'tag-name-or-attr-name',
-				value: attr.name,
-			}
-			if (attr.name === 'onload') {
-				yield {
-					kind: 'tag-name-or-attr-name',
-					value: '=',
-				}
-				yield {
-					kind: 'onload-attr-value',
-					value: '<onload>',
-				}
-			} else if (attr.value) {
-				yield {
-					kind: 'tag-name-or-attr-name',
-					value: '=',
-				}
-				yield {
-					kind: 'attr-value',
-					value: attr.value,
-				}
-			}
-		}
-		yield {
-			kind: 'close-waka',
-			value: '>',
-		}
-
-		for (const child of node.childNodes) {
-			yield * irFromConcreteTree(html, child);
-		}
-
-		if (node.sourceCodeLocation.endTag) {
-			yield {
-				kind: 'tag-name-or-attr-name',
-				value: '</' + node.tagName,
-			}
-			yield {
-				kind: 'close-waka',
-				value: '>',
-			}
-		}
-
-		return;
-	}
-
-	if (node.sourceCodeLocation) {
-		// Something else that was mentioned in the template
-		yield {
-			kind: 'unknown',
-			value: html.substring(node.sourceCodeLocation.startOffset, node.sourceCodeLocation.endOffset)
-		}
-		return;
-	}
-
-	if ('childNodes' in node) {
-		// Something automatically created:
-		// Just traverse if traverable
-		for (const child of node.childNodes) {
-			yield * irFromConcreteTree(html, child);
-		}
-	}
 }
 
 function templateItemFromAttrValue(attrValue: string): { template: StringTemplateItem[]; needsSeparator: boolean } {

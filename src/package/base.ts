@@ -26,7 +26,7 @@ export abstract class FetchCrunchBase {
 	protected abstract _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Uint8Array | Promise<Uint8Array>;
 
 	protected _htmlTemplate(): string {
-		return '<svg onload>';
+		return '<svg onload="__bootstrap__">';
 	}
 
 	protected _onloadAttribute(useCharCodes: boolean, options: { reservedIdentifierNames: ReadonlySet<string> }): StringTemplate {
