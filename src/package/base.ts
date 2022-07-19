@@ -252,6 +252,15 @@ export abstract class FetchCrunchBase {
 			return null;
 		}
 
+		if (
+			!literalIncludesTail &&
+			![0x27, 0x22, 0x20, 0x0d, 0x0a, 0x09].includes(literalBlock[literalBlock.byteLength - 1]) &&
+			![0x3e, 0x20, 0x0d, 0x0a, 0x09].includes(compressed[0])
+		) {
+			// We've just concatenated random garbage to the tag name or attr value
+			return null;
+		}
+
 		if (!literalIncludesTail) {
 			// Expect the ">" to appear in the compressed binary at pure chance
 			const compressedAsString = new TextDecoder().decode(compressed);

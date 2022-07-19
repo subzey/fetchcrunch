@@ -219,6 +219,7 @@ function stringTemplateFromIr(ir: IntermediateRepresentationItem[], onloadTempla
 			if (onloadTemplate === undefined) {
 				throw new Error('Unexpected onload template insertion point');
 			}
+			skipSeparatorNextTime = true;
 			rv.push(quote, ...onloadTemplate, quote);
 		}
 		if (irItem.kind === 'tag-name-or-attr-name') {
