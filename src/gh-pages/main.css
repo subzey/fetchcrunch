@@ -102,7 +102,7 @@ header p {
 #config {
 	border: none;
 	display: grid;
-	grid-template-columns: max-content max-content;
+	grid-template-columns: max-content minmax(max-content, 1fr);
 }
 
 #config > label {

@@ -16,7 +16,12 @@
 				<details>
 					<summary>Config</summary>
 					<fieldset id="config">
-						<label for="template">Template</label><input id="template" value="" placeholder="&lt;svg onload&gt;" spellcheck="false">
+						<label for="template">Template</label><input list="presets" id="template" value="" placeholder="&lt;svg onload=&quot;__bootstrap__&quot;&gt;" spellcheck="false">
+						<datalist id="presets">
+							<option value="&lt;svg onload=&quot;__bootstrap__&quot;&gt;"></option>
+							<option value="&lt;canvas id=&quot;a&quot;&gt;&lt;svg onload=&quot;__bootstrap__&quot;&gt;">
+							<option value="&lt;h1&gt;CLICK&lt;canvas id=&quot;a&quot;&gt;&lt;body onclick=&quot;__bootstrap__&quot;&gt;">
+						</datalist>
 						<label for="iterations">Zopfli iterations</label><input id="iterations" type="number" min="1" placeholder="50">
 					</fieldset>
 			</section>
