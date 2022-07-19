@@ -105,7 +105,7 @@ export function templatesFromIr(ir: IR, onloadTemplate: StringTemplate): {
 	head.push({ kind: 'attr-separator', 'value': ' '});
 
 	if (mid.filter(item => item.kind === 'onload-attr-value').length !== 1) {
-		throw new Error('The template should contain exactly one onload attribute');
+		throw new Error(`The template should contain one attribute with the value "${ BOOTSTRAP_ATTR_VALUE }"`);
 	}
 
 	return {
@@ -154,18 +154,27 @@ function templateItemFromAttrValue(attrValue: string): { template: StringTemplat
 
 // It's a bit heavy, but is precise
 function testHtmlAttr(attrHtmlChunk: string, shouldBe: string): boolean {
-	const frag = parseFragment(`<i x=${attrHtmlChunk}>`);
-	const attr = (frag.childNodes[0] as DefaultTreeAdapterMap['element']).attrs[0];
-	if (!attr) {
-		return false;
-	}
-	if (attr.name !== 'x') {
-		return false;
-	}
-	if (attr.value !== shouldBe) {
-		return false;
-	}
-	return true;
+	const noop = (): void => {};
+
+	const tagTokens: {attrs: {name: string, value: string}[]}[] = [];
+
+	const tokenizer = new Tokenizer({}, {
+		onCharacter: noop,
+		onComment: noop,
+		onDoctype: noop,
+		onEndTag: noop,
+		onEof: noop,
+		onNullCharacter: noop,
+		onWhitespaceCharacter: noop,
+		onParseError: noop,
+		onStartTag: (token) => {
+			tagTokens.push(token);
+		},
+	});
+
+	tokenizer.write(`<i data-test=${attrHtmlChunk}>`, true);
+
+	return (tagTokens.length === 1 && tagTokens[0].attrs.length === 1 && tagTokens[0].attrs[0].value === shouldBe);
 }
 
 function sloppyEscaped(attrHtmlChunk: string, shouldBe: string) {
@@ -173,6 +182,7 @@ function sloppyEscaped(attrHtmlChunk: string, shouldBe: string) {
 		const variants = [String.fromCharCode(Number(d))];
 		if (Number(d) === 38) {
 			variants.push('&amp');
+			variants.push('&AMP');
 		}
 		variants.push(`&#${d}`);
 		for (const variant of variants) {

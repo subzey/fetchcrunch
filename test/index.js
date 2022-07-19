@@ -10,10 +10,10 @@ async function smoke() {
 	]) {
 		for (const template of [
 			undefined,
-			'<svg onload>',
-			'<body onload>',
-			'<canvas><svg onload>',
-			'<canvas id="a"><svg onload>',
+			'<svg onload=__bootstrap__>',
+			'<body onload="__bootstrap__">',
+			'<canvas id="a"><svg onload="__bootstrap__">',
+			'<h1>CLICK<canvas id="a"><body onload="__bootstrap__">',
 		]) {
 			class Test extends FetchCrunchNode {
 				_htmlTemplate() {
@@ -45,7 +45,7 @@ async function inference() {
 
 		class WithCustomTemplate extends FetchCrunchNode {
 			_htmlTemplate() {
-				return `<canvas id="${varname}"><svg onload>`;
+				return `<canvas id="${varname}"><svg onload=__bootstrap__>`;
 			}
 		}
 

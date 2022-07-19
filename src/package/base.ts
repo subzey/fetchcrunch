@@ -1,6 +1,6 @@
 import { bitsFromBytes, bytesFromBits, bytesConcat, findTagEnd, bytesFromString, stringFromBytes, charCodeBytesFromString } from "./junkyard.js";
 import { bytesFromTemplate } from "./payload-dependent-template.js";
-import { StringTemplate, StringTemplateVariants, irFromHtml, templatesFromIr, iterateThroughTemplate } from "./template.js";
+import { StringTemplate, StringTemplateVariants, irFromHtml, templatesFromIr, iterateThroughTemplate, BOOTSTRAP_ATTR_VALUE } from "./template.js";
 
 export interface AssemblyParams {
 	leadIn: Uint8Array;
@@ -26,7 +26,7 @@ export abstract class FetchCrunchBase {
 	protected abstract _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Uint8Array | Promise<Uint8Array>;
 
 	protected _htmlTemplate(): string {
-		return '<svg onload="__bootstrap__">';
+		return `<svg onload="${ BOOTSTRAP_ATTR_VALUE }">`;
 	}
 
 	protected _onloadAttribute(useCharCodes: boolean, options: { reservedIdentifierNames: ReadonlySet<string> }): StringTemplate {
