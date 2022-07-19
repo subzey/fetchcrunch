@@ -1,4 +1,4 @@
-import { Tokenizer, parseFragment, DefaultTreeAdapterMap } from 'parse5';
+import { Tokenizer } from 'parse5';
 
 export type StringTemplateVariants = Set<string> & {
 	mutuallyExclusiveWith?: StringTemplateVariants[];
