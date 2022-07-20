@@ -6,6 +6,7 @@ import { FetchCrunchNode } from "./node.js";
 interface PackageJson {
 	version: string;
 	name: string;
+	description: string;
 }
 
 function printPrompt() {
@@ -34,17 +35,28 @@ async function printHelp() {
 	const pkgMeta = await getPkgMeta();
 	process.stderr.write(`\
 FetchCrunch v${pkgMeta.version}
-
-Wraps arbitrary JS code into a HTML page using DEFLATE compression.
-Reads the input from stdin and returns the output into stdout, classic UNIX style.
+${pkgMeta.description}
 
 Usage:
   ${pkgMeta.name} [OPTIONS]
 
+Reads the input from stdin and returns the output into stdout, classic UNIX style.
+
 Options:
   --template=    Specify template. Be careful with shell quotes!
   --iterations=  Zopfli # of iterations. Default is 50.
+
+Options for the curious ones:
+  --version      Print version and exit.
   --help         This help. \uD83D\uDE01
+
+Options for the desperate ones:
+  --direct-eval  \u26A0 May significantly slow down your demo!
+                 Use eval() directly without wrapping it into the (0,eval). See:
+                 https://262.ecma-international.org/13.0/#step-callexpression-evaluation-direct-eval
+				 
+  --empty-url    \u26A0 Will not work with data: and blob: URLs!
+                 Use the empty string as as self-fetch URL.
 
 There are no other CLI options so far.
 Since you are here, I assume you're a JavaScript developer. Feel free to extend the FetchCrunchNode class and use it with your own tweaks:
@@ -67,6 +79,8 @@ async function readStdin(): Promise<string> {
 async function main(): Promise<void> {
 	let template: string | undefined;
 	let iterations: number | undefined;
+	let directEval: boolean = false;
+	let emptyUrl: boolean = false;
 
 	if (process.argv.length > 2) {
 		if (process.argv.indexOf('--help') >= 2) {
@@ -90,6 +104,14 @@ async function main(): Promise<void> {
 				}
 				continue;
 			}
+			if (process.argv[i] === '--direct-eval') {
+				directEval = true;
+				continue;
+			}
+			if (process.argv[i] === '--empty-url') {
+				emptyUrl = true;
+				continue;
+			}
 
 			process.stderr.write(`Unknown option: ${process.argv[i]}. Run with --help for help.\n`);
 			process.exit(1);
@@ -105,6 +127,12 @@ async function main(): Promise<void> {
 		}
 		protected override _zopfliIterations(): number {
 			return iterations ?? super._zopfliIterations();
+		}
+		protected override _useDirectEval(): boolean {
+			return directEval ? true : super._useDirectEval();
+		}
+		protected override _selfFetchUrl(): string {
+			return emptyUrl ? '' : super._selfFetchUrl();
 		}
 	}
 

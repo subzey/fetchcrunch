@@ -17,7 +17,7 @@ export interface AssemblyParams {
 }
 
 /**
- * A base class that works in node, browser and deno 
+ * A base class that works in node and browser (and deno?) 
  */
 export abstract class FetchCrunchBase {
 	/** Implement me! */
@@ -29,69 +29,19 @@ export abstract class FetchCrunchBase {
 		return `<svg onload="${ BOOTSTRAP_ATTR_VALUE }">`;
 	}
 
-	protected _onloadAttribute(useCharCodes: boolean, options: { reservedIdentifierNames: ReadonlySet<string> }): StringTemplate {
-		const identifierNames = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_';
-		const identifiers: StringTemplateVariants[] = [
-			new Set('s' + identifierNames),
-			new Set('r' + identifierNames),
-			new Set('c' + identifierNames),
-		];
-		for (const identifier of identifiers) {
-			for (const reservedIdentifierName of options.reservedIdentifierNames) {
-				identifier.delete(reservedIdentifierName);
-			}
-			for (const otherIdentifier of identifiers) {
-				if (identifier === otherIdentifier) {
-					continue;
-				}
-				identifier.mutuallyExclusiveWith ??= [];
-				identifier.mutuallyExclusiveWith.push(otherIdentifier);
-			}
-		}
-
-		const [evaledStringV, readerV, chunkV] = identifiers;
-
-		/**
-		 * Decode data as the array of charCodes.
-		 * This code is shorter, but can be used only for short strings of codepoints U+0000 .. U+00FF.
-		 * 
-		 * Massive thanks to [Kang Seonghoon](https://twitter.com/senokay) for this method!
-		 */
-		const readAsCharCodes = [
-			'for(',
-				readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).getReader();',
-				chunkV, '=(await ', readerV, '.read()).value;',
-				evaledStringV, '+=String.fromCharCode(...', chunkV, ')',
-			');',
-		];
-
-		/**
-		 * Decode data as UTF-8.
-		 * Longer code, but supports the entire Unicode and strings of virtually any length.
-		 */
-		const readAsUtf8 = [
-			'for(',
-				readerV, '=(await fetch`#`).body.pipeThrough(new DecompressionStream(`deflate-raw`)).pipeThrough(new TextDecoderStream).getReader();',
-				chunkV, '=(await ', readerV, '.read()).value;',
-				evaledStringV, '+=', chunkV,
-			');',
-		];
-
-		return [
-			'(',
-				'async ', evaledStringV, '=>{',
-					...(useCharCodes ? readAsCharCodes : readAsUtf8),
-					'eval(', evaledStringV, ')',
-				'}',
-			')`//`',
-		];
-	}
-
 	/**
 	 * Characters that should be treated as a JavaScript newline.
 	 */
 	protected _jsNewlines(): ReadonlySet<string> {
 		return new Set(['\r', '\n', '\u2028', '\u2029']);
+	}
+	/**
+	 * Use direct eval().
+	 * May (and will) slow down the evaluation.
+	 * @see [Direct eval in EcmaScript spec](https://262.ecma-international.org/13.0/#step-callexpression-evaluation-direct-eval)
+	 */
+	protected _useDirectEval(): boolean {
+		return false;
 	}
 
 	/**
@@ -99,6 +49,99 @@ export abstract class FetchCrunchBase {
 	 */
 	protected _maxCallStackSize(): number {
 		return 65000;
+	}
+
+	/**
+	 * An URL used to fetch itself.
+	 * Specify an empty string at oyur own risk.
+	 */
+	protected _selfFetchUrl(): string {
+		return '#';
+	}
+
+	protected _onloadAttribute(useCharCodes: boolean, options: { reservedIdentifierNames: ReadonlySet<string> }): StringTemplate {
+		// fetch`#`.then(f=>(r=f.body.pipeThrough(new DecompressionStream(`deflate-raw`)).getReader(),n=s=>r.read().then(({value:v=``})=>(v?n:eval)(s+String.fromCharCode(...v))))`//`)
+		
+		const identifierNames = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_';
+		const useDirectEval = this._useDirectEval();
+		const selfFetchUrl = this._selfFetchUrl();
+
+		const createVariants = (preferredName: string, mutuallyExcusiveWith: StringTemplateVariants[], isImplicitGlobal: boolean): StringTemplateVariants => {
+			const variants: StringTemplateVariants = new Set(preferredName + identifierNames);
+
+			// A variable name cannot be used if:
+			// - It would shadow the global variable (if bare eval is enabled)
+			// - It would overwrite the global variable (always)
+			if (useDirectEval || isImplicitGlobal) {
+				if (options.reservedIdentifierNames) {
+					for (const reserved of options.reservedIdentifierNames) {
+						variants.delete(reserved);
+					}
+				}
+			}
+
+			for (const otherVariants of mutuallyExcusiveWith) {
+				// Forward relation
+				variants.mutuallyExclusiveWith ??= [];
+				variants.mutuallyExclusiveWith.push(otherVariants);
+				
+				// Backward relation
+				otherVariants.mutuallyExclusiveWith ??= [];
+				otherVariants.mutuallyExclusiveWith.push(variants);
+			}
+
+			return variants;
+		}
+
+		const responseV = createVariants('f', [], false);
+		const readerV = createVariants('r', [], true);
+		const readNextV = createVariants('n', [readerV], true);
+		const evaledStringV = createVariants('s', [readerV, readNextV], false);
+		const chunkV = createVariants('c', [readerV, readNextV, evaledStringV], false);
+
+		let decodeChunk = [ evaledStringV, '+', chunkV ];
+		let decodeStream = [ '.pipeThrough(new TextDecoderStream)' ];
+		const decompressStream = [ '.pipeThrough(new DecompressionStream(`deflate-raw`))' ];
+
+		/**
+		 * Decode data as the array of charCodes.
+		 * This code is shorter, but can be used only for short strings of codepoints U+0000 .. U+00FF.
+		 * 
+		 * Massive thanks to [Kang Seonghoon](https://twitter.com/senokay) for this method!
+		 */
+		if (useCharCodes) {
+			decodeChunk = [ evaledStringV, '+String.fromCharCode(...', chunkV, ')' ];
+			decodeStream = [];
+		}
+
+		let onChunkRead = [
+			'({value:', chunkV ,'=``})=>',
+				'(', chunkV, '?', readNextV, ':eval)(', ...decodeChunk, ')'
+		];
+
+		// Call eval() keeping all the closures.
+		// Two bytes shorter, but may result much more slow runtime!
+		// I mean, MUCH more slow.
+		if (useDirectEval) {
+			onChunkRead = [
+				'({value:', chunkV ,'})=>',
+					chunkV, '?', readNextV, '(', ...decodeChunk, '):eval(', evaledStringV, ')'
+			]
+		}
+
+		return [
+			'fetch`', selfFetchUrl, '`.then(',
+				responseV, '=>(',
+					readerV, '=', responseV, '.body', ...decompressStream, ...decodeStream, '.getReader()',
+				',',
+					readNextV, '=', evaledStringV, '=>',
+						readerV, '.read().then(',
+							...onChunkRead,
+						')',
+				')',
+				'`//`',
+			')'
+		];
 	}
 
 	protected _generateLeadIn(template: StringTemplate): { leadIn: Uint8Array, leadInDecompressedSize: number } {

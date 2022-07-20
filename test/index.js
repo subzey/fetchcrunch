@@ -39,9 +39,21 @@ async function jumbo() {
 	await new FetchCrunchNode().crunch(Buffer.alloc(1024 * 1024).fill(49));
 }
 
+
+function * findIndices(haystack, needle) {
+	let i = -1;
+	while (true) {
+		i = haystack.indexOf(needle, i + 1);
+		if (i === -1) {
+			break;
+		}
+		yield i;
+	}
+}
+
 async function inference() {
 	for (const varname of ['a', 'b', 'c']) {
-		const input = `async ${varname}=>{`;
+		const input = `=>${varname}.read().then`;
 
 		class WithCustomTemplate extends FetchCrunchNode {
 			_htmlTemplate() {
@@ -52,10 +64,12 @@ async function inference() {
 		const vanilla = inflateRawSync(await new FetchCrunchNode().crunch(input)).toString();
 		const custom = inflateRawSync(await new WithCustomTemplate().crunch(input)).toString();
 
-		if ([...vanilla.matchAll(input)].length < 2) {
+		if ([...findIndices(vanilla, input)].length < 2) {
+			debugger;
 			throw new Error('The bootstrap variable name should be inferred from input');
 		}
-		if ([...custom.matchAll(input)].length > 1) {
+		if ([...findIndices(custom, input)].length > 1) {
+			debugger;
 			throw new Error('An id mentioned in the template should not be used in the bootstrap');
 		}
 	}
