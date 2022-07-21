@@ -88,7 +88,11 @@ function readInputsFromUI() {
 			throw new RangeError('The number of iterations should be a positive integer');
 		}
 	}
-	return { source, template, iterations }
+
+	const directEval = document.querySelector('#direct-eval' as 'input')!.checked;
+	const emptyUrl = document.querySelector('#empty-url' as 'input')!.checked;
+
+	return { source, template, iterations, directEval, emptyUrl }
 }
 
 {
@@ -98,14 +102,20 @@ function readInputsFromUI() {
 		const output = document.querySelector('#output-section output')!;
 		output.textContent = 'Crunching...';
 		try {
-			const result = await crunch(readInputsFromUI());
+			const inputs = readInputsFromUI();
+			const result = await crunch(inputs);
 			const dateCreated = new Date();
 			const blob = new Blob([result], { type: 'text/html;charset=utf-8' });
 			const blobHref = URL.createObjectURL(blob);
 
 			const link = document.createElement('a');
+			let linkText = 'Preview';
+			if (inputs.emptyUrl) {
+				linkText += ' \u{1f4a3}';
+				link.title = 'The preview cannot work properly with Empty self-fetch URL enabled';
+			}
 			link.target = '_blank';
-			link.textContent = 'Preview';
+			link.textContent = linkText;
 			link.href = blobHref;
 			
 			const button = document.createElement('button');

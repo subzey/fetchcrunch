@@ -105,6 +105,10 @@ header p {
 	grid-template-columns: max-content minmax(max-content, 1fr);
 }
 
+#config > input[type="checkbox"i] {
+	justify-self: start;
+}
+
 #config > label {
 	margin: .25em 0;
 	margin-inline-end: .5em;

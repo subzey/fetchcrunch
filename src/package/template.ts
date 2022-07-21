@@ -46,7 +46,13 @@ export function irFromHtml(html: string): { ir: IR, ids: ReadonlySet<string> } {
 				ir.push({ kind: 'tag-name-or-attr-name', value: '<' + token.tagName });
 				for (const attr of token.attrs) {
 					if (attr.name === 'id' && attr.value) {
+						// Ids are implicit globals
 						ids.add(attr.value);
+					}
+					if (token.tagName === 'svg' && attr.value === BOOTSTRAP_ATTR_VALUE) {
+						// Those are not ids, but still cannot be used in <svg on* >
+						ids.add('x');
+						ids.add('y');
 					}
 
 					ir.push({ kind: 'attr-separator', value: ' '});

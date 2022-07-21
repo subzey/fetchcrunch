@@ -20,22 +20,38 @@ let singletonDeflater: WasmZopfliBrowser | null = null;
 class FetchCrunchBrowser extends FetchCrunchBase {
 	private _iterations: number | undefined;
 	private _template: string | undefined;
+	private _directEval: boolean | undefined;
+	private _emptyUrl: boolean | undefined;
 
-	public constructor(params: { iterations?: number; template?: string}) {
+	public constructor(params: {
+		iterations?: number;
+		template?: string;
+		directEval?: boolean;
+		emptyUrl?: boolean;
+	}) {
 		super();
 		this._iterations = params.iterations;
 		this._template = params.template;
+		this._directEval = params.directEval;
+		this._emptyUrl = params.emptyUrl;
 	}
-	protected _htmlTemplate(): string {
+	protected override _htmlTemplate(): string {
 		return this._template || super._htmlTemplate();
 	}
-	protected _binaryFromDeflateRaw(compressed: Uint8Array): Uint8Array {
+	protected override _binaryFromDeflateRaw(compressed: Uint8Array): Uint8Array {
 		return inflateRaw(compressed);
 	}
-	protected _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Promise<Uint8Array> {
+	protected override _deflateRawFromBinary(source: Uint8Array, dictionary: Uint8Array): Promise<Uint8Array> {
 		singletonDeflater ??= new WasmZopfliBrowser();
 		return singletonDeflater.deflateRaw(source, { dictionary, numIterations: this._iterations });
 	}
+	protected override _useDirectEval(): boolean {
+		return this._directEval ?? super._useDirectEval();
+	}
+	protected override _selfFetchUrl(): string {
+		return this._emptyUrl ? '' : super._selfFetchUrl();
+	}
+
 }
 
 self.addEventListener('message', async (e: MessageEvent) => {
