@@ -3,13 +3,15 @@
 	"type": "module",
 	"name": "fetchcrunch",
 	"description": "A tool to create a self unpacking HTML pages with DEFLATE compressed JS",
-	"version": "1.0.0-beta.6",
+	"version": "1.0.0-beta.7",
 	"license": "MIT",
 	"exports": {
-		"./base": "./base.js",
 		".": {
 			"node": "./node.js"
-		}
+		},
+		"./base": "./base.js",
+		"./wasm-zopfli-node": "./wasm-zopfli-node.js",
+		"./wasm-zopfli-base": "./wasm-zopfli-base.js"
 	},
 	"sideEffects": false,
 	"bin": "./cli.js",
